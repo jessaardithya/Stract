@@ -56,7 +56,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	}
 
 	rows, err := h.DB.Query(context.Background(),
-		"SELECT id, title, status, position, creator_id FROM tasks WHERE creator_id = $1 ORDER BY position ASC",
+		"SELECT id, title, status, position, creator_id FROM stract.tasks WHERE creator_id = $1 ORDER BY position ASC",
 		userID,
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 	// you'd query the MAX(position) from the DB.
 	var nextPosition int
 	err := h.DB.QueryRow(context.Background(),
-		"SELECT COALESCE(MAX(position), 0) + 1000 FROM tasks WHERE creator_id = $1",
+		"SELECT COALESCE(MAX(position), 0) + 1000 FROM stract.tasks WHERE creator_id = $1",
 		userID,
 	).Scan(&nextPosition)
 
@@ -116,7 +116,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 
 	var insertedTask Task
 	err = h.DB.QueryRow(context.Background(),
-		`INSERT INTO tasks (title, status, position, creator_id) 
+		`INSERT INTO stract.tasks (title, status, position, creator_id) 
 		 VALUES ($1, $2, $3, $4) 
 		 RETURNING id, title, status, position, creator_id`,
 		req.Title, req.Status, nextPosition, userID,
@@ -147,7 +147,7 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 	}
 
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"UPDATE tasks SET position = $1 WHERE id = $2 AND creator_id = $3",
+		"UPDATE stract.tasks SET position = $1 WHERE id = $2 AND creator_id = $3",
 		req.Position, id, userID,
 	)
 
@@ -175,7 +175,7 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 	}
 
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"DELETE FROM tasks WHERE id = $1 AND creator_id = $2",
+		"DELETE FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
 	)
 
