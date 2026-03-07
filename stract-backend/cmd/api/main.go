@@ -15,14 +15,10 @@ import (
 )
 
 func main() {
-	// 1. Load the .env file
-	// We only warn if it's missing, since environments like Docker/Production
-	// might inject variables directly without a .env file.
 	if err := godotenv.Load(); err != nil {
 		log.Println("Info: No .env file found or error loading it, trusting system environment variables.")
 	}
 
-	// 2. Initialize Database Connection
 	db, err := database.New()
 	if err != nil {
 		log.Fatalf("Failed to connect to the database: %v\n", err)
@@ -49,7 +45,7 @@ func main() {
 	apiV1.Use(middleware.Auth())
 
 	// Register modular components into the router group
-	tasks.RegisterRoutes(apiV1)
+	tasks.RegisterRoutes(apiV1, db)
 
 	// 5. Start the Server
 	port := os.Getenv("PORT")
