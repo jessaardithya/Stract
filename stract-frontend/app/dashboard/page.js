@@ -1,4 +1,3 @@
-import Navbar from '@/components/Navbar';
 import Dashboard from '@/components/Dashboard';
 
 export const metadata = {
@@ -9,7 +8,6 @@ export const metadata = {
 export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-[#fafaf8]">
-      <Navbar />
       <Dashboard />
     </main>
   );
