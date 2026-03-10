@@ -4,9 +4,12 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+
+	"stract-backend/internal/core/events"
 )
 
 // Handler holds the dependencies for task routes (like the database connection).
@@ -16,11 +19,11 @@ type Handler struct {
 
 // Task represents a task in the database
 type Task struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	Position  int    `json:"position"`
-	CreatorID string `json:"creator_id"`
+	ID        string  `json:"id"`
+	Title     string  `json:"title"`
+	Status    string  `json:"status"`
+	Position  float64 `json:"position"`
+	CreatorID string  `json:"creator_id"`
 }
 
 // CreateTaskRequest represents the payload for creating a task
@@ -29,9 +32,17 @@ type CreateTaskRequest struct {
 	Status string `json:"status" binding:"required"`
 }
 
-// UpdatePositionRequest represents the payload for updating a task's position
+// UpdatePositionRequest represents the payload for updating a task's position and status.
+// NextPos is a pointer so we can distinguish "absent / null" (dropped at bottom).
 type UpdatePositionRequest struct {
-	Position int `json:"position" binding:"required"`
+	PrevPos float64  `json:"prev_pos"`
+	NextPos *float64 `json:"next_pos"`
+	Status  string   `json:"status" binding:"required"`
+}
+
+// UpdateTaskRequest represents the payload for updating a task's title.
+type UpdateTaskRequest struct {
+	Title string `json:"title" binding:"required"`
 }
 
 // RegisterRoutes binds the task-specific HTTP endpoints to the router.
@@ -42,6 +53,7 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
 	{
 		tasksGroup.GET("", h.ListTasks)
 		tasksGroup.POST("", h.CreateTask)
+		tasksGroup.PATCH("/:id", h.UpdateTask)
 		tasksGroup.PATCH("/:id/position", h.UpdateTaskPosition)
 		tasksGroup.DELETE("/:id", h.DeleteTask)
 	}
@@ -56,7 +68,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	}
 
 	rows, err := h.DB.Query(context.Background(),
-		"SELECT id, title, status, position, creator_id FROM stract.tasks WHERE creator_id = $1 ORDER BY position ASC",
+		"SELECT id, title, status, position, creator_id FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL ORDER BY position ASC",
 		userID,
 	)
 	if err != nil {
@@ -85,6 +97,47 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": tasksList})
 }
 
+// UpdateTask handles PATCH requests to update a task's title.
+func (h *Handler) UpdateTask(c *gin.Context) {
+	id := c.Param("id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	var updated Task
+	err := h.DB.QueryRow(context.Background(),
+		`UPDATE stract.tasks SET title = $1 WHERE id = $2 AND creator_id = $3
+		 RETURNING id, title, status, position, creator_id`,
+		req.Title, id, userID,
+	).Scan(&updated.ID, &updated.Title, &updated.Status, &updated.Position, &updated.CreatorID)
+
+	if err != nil {
+		log.Printf("Error updating task title: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
+		return
+	}
+
+	events.Emit(events.TaskEvent{
+		Timestamp: time.Now(),
+		UserID:    userID.(string),
+		Action:    "updated",
+		TaskID:    id,
+		ToStatus:  updated.Status,
+	})
+
+	c.JSON(http.StatusOK, gin.H{"data": updated})
+}
+
+
+
 // CreateTask handles POST requests to create a new task.
 func (h *Handler) CreateTask(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -99,25 +152,22 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		return
 	}
 
-	// Calculate next position (max position + 1024 for example, or simply a basic integer increment)
-	// For simplicity, we'll assign a starting position of 1000, but in production,
-	// you'd query the MAX(position) from the DB.
-	var nextPosition int
+	// Calculate next position: MAX(position) + 65536 to preserve FLOAT8 midpoint space
+	var nextPosition float64
 	err := h.DB.QueryRow(context.Background(),
-		"SELECT COALESCE(MAX(position), 0) + 1000 FROM stract.tasks WHERE creator_id = $1",
+		"SELECT COALESCE(MAX(position), 0) + 65536 FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL",
 		userID,
 	).Scan(&nextPosition)
 
 	if err != nil {
 		log.Printf("Error calculating position: %v", err)
-		// Fallback position
-		nextPosition = 1000
+		nextPosition = 65536.0
 	}
 
 	var insertedTask Task
 	err = h.DB.QueryRow(context.Background(),
-		`INSERT INTO stract.tasks (title, status, position, creator_id) 
-		 VALUES ($1, $2, $3, $4) 
+		`INSERT INTO stract.tasks (title, status, position, creator_id)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, title, status, position, creator_id`,
 		req.Title, req.Status, nextPosition, userID,
 	).Scan(&insertedTask.ID, &insertedTask.Title, &insertedTask.Status, &insertedTask.Position, &insertedTask.CreatorID)
@@ -128,10 +178,18 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	events.Emit(events.TaskEvent{
+		Timestamp: time.Now(),
+		UserID:    userID.(string),
+		Action:    "created",
+		TaskID:    insertedTask.ID,
+		ToStatus:  insertedTask.Status,
+	})
+
 	c.JSON(http.StatusCreated, gin.H{"data": insertedTask})
 }
 
-// UpdateTaskPosition handles PATCH requests to reorder a task.
+// UpdateTaskPosition handles PATCH requests to reorder a task using the midpoint algorithm.
 func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 	id := c.Param("id")
 	userID, exists := c.Get("user_id")
@@ -146,9 +204,47 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 		return
 	}
 
+	// --- Midpoint algorithm edge-case validation ---
+
+	// Determine nextPos value (default: dropped at bottom → prev + 65536)
+	var nextPos float64
+	if req.NextPos != nil {
+		nextPos = *req.NextPos
+
+		// prev >= next is invalid ordering
+		if req.PrevPos >= nextPos {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid position bounds"})
+			return
+		}
+
+		// Precision floor: gap too small to subdivide further
+		if nextPos-req.PrevPos < 0.001 {
+			c.JSON(http.StatusConflict, gin.H{"error": "position space exhausted, trigger rebalance"})
+			return
+		}
+	} else {
+		// Dropped at bottom
+		nextPos = req.PrevPos + 65536.0
+	}
+
+	newPos := (req.PrevPos + nextPos) / 2.0
+
+	// --- Fetch current status before update (for event emission) ---
+	var oldStatus string
+	err := h.DB.QueryRow(context.Background(),
+		"SELECT status FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+		id, userID,
+	).Scan(&oldStatus)
+	if err != nil {
+		log.Printf("Error fetching task status: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
+		return
+	}
+
+	// --- Perform update ---
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"UPDATE stract.tasks SET position = $1 WHERE id = $2 AND creator_id = $3",
-		req.Position, id, userID,
+		"UPDATE stract.tasks SET position = $1, status = $2 WHERE id = $3 AND creator_id = $4",
+		newPos, req.Status, id, userID,
 	)
 
 	if err != nil {
@@ -162,7 +258,16 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Task position updated successfully"})
+	events.Emit(events.TaskEvent{
+		Timestamp:  time.Now(),
+		UserID:     userID.(string),
+		Action:     "moved",
+		TaskID:     id,
+		FromStatus: oldStatus,
+		ToStatus:   req.Status,
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task position updated successfully", "position": newPos})
 }
 
 // DeleteTask handles DELETE requests for a specific task.
@@ -171,6 +276,18 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// --- Fetch current status before delete (for event emission) ---
+	var oldStatus string
+	err := h.DB.QueryRow(context.Background(),
+		"SELECT status FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+		id, userID,
+	).Scan(&oldStatus)
+	if err != nil {
+		log.Printf("Error fetching task before delete: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
 
@@ -189,6 +306,14 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
+
+	events.Emit(events.TaskEvent{
+		Timestamp:  time.Now(),
+		UserID:     userID.(string),
+		Action:     "deleted",
+		TaskID:     id,
+		FromStatus: oldStatus,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 }
