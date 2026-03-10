@@ -80,18 +80,16 @@ export default function Sidebar() {
     <aside className="fixed top-0 left-0 h-screen w-[220px] z-40 bg-white border-r border-[#e4e4e0] flex flex-col">
       {/* Workspace Switcher */}
       <Popover open={wsOpen} onOpenChange={setWsOpen}>
-        <PopoverTrigger asChild>
-          <button className="h-14 flex items-center gap-2.5 px-4 border-b border-[#e4e4e0] w-full hover:bg-[#f4f4f2] transition-colors text-left">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">
-                {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'S'}
-              </span>
-            </div>
-            <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
-              {activeWorkspace?.name ?? 'Loading…'}
+        <PopoverTrigger className="h-14 flex items-center gap-2.5 px-4 border-b border-[#e4e4e0] w-full hover:bg-[#f4f4f2] transition-colors text-left outline-none cursor-pointer">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">
+              {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'S'}
             </span>
-            <ChevronsUpDown size={13} className="text-[#8a8a85] shrink-0" />
-          </button>
+          </div>
+          <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
+            {activeWorkspace?.name ?? 'Loading…'}
+          </span>
+          <ChevronsUpDown size={13} className="text-[#8a8a85] shrink-0" />
         </PopoverTrigger>
         <PopoverContent className="w-[200px] p-1.5" align="start" side="bottom">
           <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-2 py-1">Workspaces</p>
