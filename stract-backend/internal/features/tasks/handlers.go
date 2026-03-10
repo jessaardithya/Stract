@@ -19,11 +19,12 @@ type Handler struct {
 
 // Task represents a task in the database
 type Task struct {
-	ID        string  `json:"id"`
-	Title     string  `json:"title"`
-	Status    string  `json:"status"`
-	Position  float64 `json:"position"`
-	CreatorID string  `json:"creator_id"`
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Status      string  `json:"status"`
+	Position    float64 `json:"position"`
+	CreatorID   string  `json:"creator_id"`
+	LastMovedAt string  `json:"last_moved_at"`
 }
 
 // CreateTaskRequest represents the payload for creating a task
@@ -68,7 +69,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	}
 
 	rows, err := h.DB.Query(context.Background(),
-		"SELECT id, title, status, position, creator_id FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL ORDER BY position ASC",
+		"SELECT id, title, status, position, creator_id, COALESCE(last_moved_at::text, '') FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL ORDER BY position ASC",
 		userID,
 	)
 	if err != nil {
@@ -81,7 +82,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	var tasksList []Task
 	for rows.Next() {
 		var t Task
-		if err := rows.Scan(&t.ID, &t.Title, &t.Status, &t.Position, &t.CreatorID); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.Status, &t.Position, &t.CreatorID, &t.LastMovedAt); err != nil {
 			log.Printf("Error scanning task row: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse tasks"})
 			return
@@ -115,9 +116,9 @@ func (h *Handler) UpdateTask(c *gin.Context) {
 	var updated Task
 	err := h.DB.QueryRow(context.Background(),
 		`UPDATE stract.tasks SET title = $1 WHERE id = $2 AND creator_id = $3
-		 RETURNING id, title, status, position, creator_id`,
+		 RETURNING id, title, status, position, creator_id, COALESCE(last_moved_at::text, '')`,
 		req.Title, id, userID,
-	).Scan(&updated.ID, &updated.Title, &updated.Status, &updated.Position, &updated.CreatorID)
+	).Scan(&updated.ID, &updated.Title, &updated.Status, &updated.Position, &updated.CreatorID, &updated.LastMovedAt)
 
 	if err != nil {
 		log.Printf("Error updating task title: %v", err)
@@ -130,6 +131,7 @@ func (h *Handler) UpdateTask(c *gin.Context) {
 		UserID:    userID.(string),
 		Action:    "updated",
 		TaskID:    id,
+		TaskTitle: updated.Title,
 		ToStatus:  updated.Status,
 	})
 
@@ -168,9 +170,9 @@ func (h *Handler) CreateTask(c *gin.Context) {
 	err = h.DB.QueryRow(context.Background(),
 		`INSERT INTO stract.tasks (title, status, position, creator_id)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, title, status, position, creator_id`,
+		 RETURNING id, title, status, position, creator_id, COALESCE(last_moved_at::text, '')`,
 		req.Title, req.Status, nextPosition, userID,
-	).Scan(&insertedTask.ID, &insertedTask.Title, &insertedTask.Status, &insertedTask.Position, &insertedTask.CreatorID)
+	).Scan(&insertedTask.ID, &insertedTask.Title, &insertedTask.Status, &insertedTask.Position, &insertedTask.CreatorID, &insertedTask.LastMovedAt)
 
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
@@ -183,6 +185,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		UserID:    userID.(string),
 		Action:    "created",
 		TaskID:    insertedTask.ID,
+		TaskTitle: insertedTask.Title,
 		ToStatus:  insertedTask.Status,
 	})
 
@@ -229,21 +232,21 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 
 	newPos := (req.PrevPos + nextPos) / 2.0
 
-	// --- Fetch current status before update (for event emission) ---
-	var oldStatus string
+	// --- Fetch current status+title before update (for event emission) ---
+	var oldStatus, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
-		"SELECT status FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+		"SELECT status, title FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
-	).Scan(&oldStatus)
+	).Scan(&oldStatus, &taskTitle)
 	if err != nil {
 		log.Printf("Error fetching task status: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
 
-	// --- Perform update ---
+	// --- Perform update (set last_moved_at = NOW()) ---
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"UPDATE stract.tasks SET position = $1, status = $2 WHERE id = $3 AND creator_id = $4",
+		"UPDATE stract.tasks SET position = $1, status = $2, last_moved_at = NOW() WHERE id = $3 AND creator_id = $4",
 		newPos, req.Status, id, userID,
 	)
 
@@ -263,6 +266,7 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 		UserID:     userID.(string),
 		Action:     "moved",
 		TaskID:     id,
+		TaskTitle:  taskTitle,
 		FromStatus: oldStatus,
 		ToStatus:   req.Status,
 	})
@@ -279,12 +283,12 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	// --- Fetch current status before delete (for event emission) ---
-	var oldStatus string
+	// --- Fetch current status+title before delete (for event emission) ---
+	var oldStatus, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
-		"SELECT status FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+		"SELECT status, title FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
-	).Scan(&oldStatus)
+	).Scan(&oldStatus, &taskTitle)
 	if err != nil {
 		log.Printf("Error fetching task before delete: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
@@ -312,6 +316,7 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 		UserID:     userID.(string),
 		Action:     "deleted",
 		TaskID:     id,
+		TaskTitle:  taskTitle,
 		FromStatus: oldStatus,
 	})
 

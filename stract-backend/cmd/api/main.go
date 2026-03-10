@@ -14,14 +14,17 @@ import (
 	"github.com/joho/godotenv"
 
 	"stract-backend/internal/core/database"
+	"stract-backend/internal/core/events"
 	"stract-backend/internal/core/middleware"
+	"stract-backend/internal/core/stream"
 	"stract-backend/internal/core/workers"
+	"stract-backend/internal/features/analytics"
 	"stract-backend/internal/features/tasks"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("Info: No .env file found or error loading it, trusting system environment variables.")
+		log.Println("Info: No .env file found, trusting system environment variables.")
 	}
 
 	// --- Graceful shutdown context tied to OS signals ---
@@ -35,16 +38,18 @@ func main() {
 	}
 	defer db.Close(context.Background())
 
+	// --- SSE Broker (injected into event emitter so every mutation broadcasts) ---
+	broker := stream.NewBroker()
+	events.SetBroker(broker)
+
 	// --- Background janitor (hard-deletes soft-deleted tasks after 30 days) ---
 	go workers.StartJanitor(ctx, db, 12*time.Hour)
 
 	// --- Gin router ---
 	r := gin.New()
 
-	// Task 4: Panic recovery must be outermost middleware
+	// Task 4 (Phase 3): Panic recovery must be outermost middleware
 	r.Use(middleware.Recovery())
-
-	// Access logging
 	r.Use(gin.Logger())
 
 	// CORS for Next.js dev server
@@ -57,16 +62,20 @@ func main() {
 
 	// Health check (public)
 	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Stract API is online!",
-			"status":  "healthy",
-		})
+		c.JSON(http.StatusOK, gin.H{"message": "Stract API is online!", "status": "healthy"})
 	})
 
 	// Authenticated API routes
 	apiV1 := r.Group("/api/v1")
 	apiV1.Use(middleware.Auth())
+
 	tasks.RegisterRoutes(apiV1, db)
+	analytics.RegisterRoutes(apiV1, db)
+
+	// SSE stream — auth is handled inside the handler via ?token= query param
+	// (browser EventSource does not support custom headers)
+	apiV1SSE := r.Group("/api/v1")
+	apiV1SSE.GET("/stream", stream.StreamHandler(broker))
 
 	// --- HTTP server with graceful shutdown ---
 	port := os.Getenv("PORT")
@@ -79,7 +88,6 @@ func main() {
 		Handler: r,
 	}
 
-	// Start server in background goroutine
 	go func() {
 		log.Printf("Starting API server on :%s\n", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -87,7 +95,6 @@ func main() {
 		}
 	}()
 
-	// Block until signal received
 	<-ctx.Done()
 	log.Println("Shutdown signal received, draining connections...")
 

@@ -66,4 +66,12 @@ export async function updateTask(id, title) {
   return handleResponse(res);
 }
 
+export async function fetchAnalytics() {
+  const res = await fetch(`${API_BASE}/analytics/summary`, {
+    headers: getHeaders(),
+  });
+  return handleResponse(res);
+}
+
+
 

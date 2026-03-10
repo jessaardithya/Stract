@@ -1,9 +1,11 @@
 'use client';
 
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
+import { toast } from 'sonner';
 import Column from './Column';
 import { fetchTasks, deleteTask, updateTaskPosition } from '@/lib/api';
+import { useRealtime } from '@/hooks/useRealtime';
 
 const COLUMNS = ['todo', 'in-progress', 'done'];
 
@@ -53,23 +55,60 @@ function boardReducer(state, action) {
   }
 }
 
+// Toast message factory matching the spec's templates
+function showEventToast(event) {
+  const title = event.task_title ? `'${event.task_title}'` : 'Task';
+  const to = event.to ? event.to.replace('-', ' ') : '';
+
+  switch (event.action) {
+    case 'created':
+      toast.success(`${title} added to ${to}`);
+      break;
+    case 'moved':
+      toast(`${title} moved to ${to}`);
+      break;
+    case 'deleted':
+      toast.error(`${title} deleted`);
+      break;
+    case 'updated':
+      toast(`${title} renamed`);
+      break;
+    default:
+      break;
+  }
+}
+
 // --- Board Component ---
 export default function Board() {
   const [state, dispatch] = useReducer(boardReducer, initialState);
+  // Track in-flight mutations to suppress self-triggered refetches on SSE
+  const mutationInFlightRef = useRef(false);
 
   // Fetch tasks on mount
-  useEffect(() => {
-    async function load() {
-      dispatch({ type: 'FETCH_START' });
-      try {
-        const result = await fetchTasks();
-        dispatch({ type: 'FETCH_SUCCESS', payload: result.data || [] });
-      } catch (err) {
-        dispatch({ type: 'FETCH_ERROR', payload: err.message });
-      }
+  const load = useCallback(async () => {
+    dispatch({ type: 'FETCH_START' });
+    try {
+      const result = await fetchTasks();
+      dispatch({ type: 'FETCH_SUCCESS', payload: result.data || [] });
+    } catch (err) {
+      dispatch({ type: 'FETCH_ERROR', payload: err.message });
     }
-    load();
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // --- SSE real-time sync ---
+  useRealtime((event, isSelf) => {
+    // Always show toast (even for self-triggered)
+    showEventToast(event);
+
+    // Only refetch if triggered by another tab
+    if (!isSelf) {
+      load();
+    }
+  }, mutationInFlightRef);
 
   // Partition tasks by status
   const getColumnTasks = useCallback(
@@ -83,16 +122,16 @@ export default function Board() {
   // Handle delete
   const handleDelete = useCallback(
     async (taskId) => {
-      // Optimistic delete
       const previousTasks = [...state.tasks];
       dispatch({ type: 'DELETE_TASK', payload: taskId });
-
+      mutationInFlightRef.current = true;
       try {
         await deleteTask(taskId);
       } catch (err) {
-        // Rollback
         dispatch({ type: 'SET_TASKS', payload: previousTasks });
         dispatch({ type: 'SET_ERROR', payload: `Failed to delete: ${err.message}` });
+      } finally {
+        setTimeout(() => { mutationInFlightRef.current = false; }, 500);
       }
     },
     [state.tasks]
@@ -118,10 +157,7 @@ export default function Board() {
     async (result) => {
       const { source, destination, draggableId } = result;
 
-      // Dropped outside any droppable
       if (!destination) return;
-
-      // Dropped back to same position
       if (
         source.droppableId === destination.droppableId &&
         source.index === destination.index
@@ -134,26 +170,21 @@ export default function Board() {
 
       const newStatus = destination.droppableId;
 
-      // Get the destination column tasks (excluding the dragged task), sorted by position
       const destColumnTasks = state.tasks
         .filter((t) => t.status === newStatus && t.id !== draggableId)
         .sort((a, b) => a.position - b.position);
 
-      // Find the neighbors at the drop index
       const prevTask = destColumnTasks[destination.index - 1] ?? null;
       const nextTask = destColumnTasks[destination.index] ?? null;
 
       const prevPos = prevTask ? prevTask.position : 0;
       const nextPos = nextTask ? nextTask.position : null;
 
-      // Compute optimistic midpoint position for immediate UI update
       const optimisticPos = nextPos !== null
         ? (prevPos + nextPos) / 2
         : prevPos + 65536;
 
       const updatedTask = { ...task, status: newStatus, position: optimisticPos };
-
-      // Build merged tasks array with optimistic update
       const updatedTasks = [
         ...state.tasks.filter((t) => t.id !== draggableId),
         updatedTask,
@@ -161,30 +192,25 @@ export default function Board() {
 
       dispatch({ type: 'SET_TASKS', payload: updatedTasks });
 
+      mutationInFlightRef.current = true;
       try {
         await updateTaskPosition(draggableId, newStatus, prevPos, nextPos);
       } catch (err) {
-        // Rollback on failure
         dispatch({ type: 'SET_TASKS', payload: previousTasks });
         dispatch({ type: 'SET_ERROR', payload: `Failed to move task: ${err.message}` });
+      } finally {
+        setTimeout(() => { mutationInFlightRef.current = false; }, 500);
       }
     },
     [state.tasks]
   );
-
 
   // --- Loading Skeleton ---
   if (state.loading) {
     return (
       <div className="flex gap-5 max-w-6xl mx-auto px-6 pb-8">
         {COLUMNS.map((col) => (
-          <div key={col} className="w-[300px] min-w-[300px] rounded-xl bg-[#f4f4f2] border border-[#e4e4e0] p-4 space-y-3">
-            <div className="h-6 bg-[#e4e4e0] rounded-md animate-pulse w-1/2" />
-            <div className="h-px bg-[#e4e4e0]" />
-            <div className="h-[72px] bg-white rounded-lg border border-[#e4e4e0] animate-pulse" />
-            <div className="h-[72px] bg-white/80 rounded-lg border border-[#e4e4e0] animate-pulse" />
-            <div className="h-[72px] bg-white/60 rounded-lg border border-[#e4e4e0] animate-pulse" />
-          </div>
+          <div key={col} className="flex flex-col w-[300px] min-w-[300px] rounded-xl bg-[#f4f4f2] border border-[#e4e4e0] p-4 h-60 animate-pulse" />
         ))}
       </div>
     );
@@ -192,11 +218,11 @@ export default function Board() {
 
   return (
     <div>
-      {/* Error Banner */}
+      {/* Error banner */}
       {state.error && (
         <div className="max-w-6xl mx-auto px-6 mb-4">
-          <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
-            <p className="text-sm text-red-600 font-medium">{state.error}</p>
+          <div className="flex items-center justify-between bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2.5">
+            <span>{state.error}</span>
             <button
               onClick={() => dispatch({ type: 'CLEAR_ERROR' })}
               className="text-red-400 hover:text-red-600 text-xs font-semibold ml-4 underline underline-offset-2"
@@ -219,6 +245,7 @@ export default function Board() {
               onRename={handleRename}
               onTaskAdded={handleTaskAdded}
               onError={handleError}
+              mutationInFlightRef={mutationInFlightRef}
             />
           ))}
         </div>

@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { Trash2, Calendar, Pencil } from 'lucide-react';
+import { Trash2, Calendar, Pencil, Flame } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { updateTask } from '@/lib/api';
 
 export default function TaskCard({ task, index, onDelete, onRename }) {
@@ -15,12 +16,10 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef(null);
 
-  // Keep editTitle in sync if task is updated externally
   useEffect(() => {
     if (!isEditing) setEditTitle(task.title);
   }, [task.title, isEditing]);
 
-  // Auto-focus input when entering edit mode
   useEffect(() => {
     if (isEditing) inputRef.current?.select();
   }, [isEditing]);
@@ -43,7 +42,6 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
       onRename(task.id, result.data.title);
       setIsEditing(false);
     } catch {
-      // Revert on error
       setEditTitle(task.title);
       setIsEditing(false);
     } finally {
@@ -59,7 +57,16 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
     }
   };
 
-  const decorDate = 'Mar 10';
+  // --- Age indicator ---
+  const ageLabel = (() => {
+    if (!task.last_moved_at) return null;
+    const days = differenceInDays(new Date(), new Date(task.last_moved_at));
+    if (days < 1) return null;
+    const label = formatDistanceToNow(new Date(task.last_moved_at), { addSuffix: true });
+    if (days > 7) return { label, color: 'text-red-400', Icon: Flame };
+    if (days > 3) return { label, color: 'text-amber-500', Icon: null };
+    return { label, color: 'text-[#8a8a85]', Icon: null };
+  })();
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -83,7 +90,6 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
               {/* Title row */}
               <div className="flex items-start justify-between gap-2">
                 {isEditing ? (
-                  /* Inline edit input */
                   <Input
                     ref={inputRef}
                     value={editTitle}
@@ -95,7 +101,6 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
-                  /* Task title — double-click to edit */
                   <p
                     onDoubleClick={handleStartEdit}
                     title="Double-click to edit"
@@ -105,7 +110,6 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
                   </p>
                 )}
 
-                {/* Action buttons — visible on hover */}
                 {!isEditing && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0">
                     <Tooltip>
@@ -134,9 +138,19 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
               {/* Metadata row */}
               {!isEditing && (
                 <div className="flex items-center justify-between mt-2.5">
-                  <div className="flex items-center gap-1 text-[#8a8a85]">
-                    <Calendar size={11} />
-                    <span className="text-[11px]">{decorDate}</span>
+                  <div className="flex items-center gap-2">
+                    {/* Age indicator */}
+                    {ageLabel ? (
+                      <span className={`flex items-center gap-0.5 text-[11px] ${ageLabel.color}`}>
+                        {ageLabel.Icon && <ageLabel.Icon size={11} />}
+                        {ageLabel.label}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[#8a8a85]">
+                        <Calendar size={11} />
+                        <span className="text-[11px]">Just now</span>
+                      </div>
+                    )}
                   </div>
                   <Avatar className="h-5 w-5">
                     <AvatarFallback className="text-[10px] bg-violet-100 text-violet-600 font-semibold">J</AvatarFallback>
