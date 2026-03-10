@@ -8,10 +8,11 @@ const AppContext = createContext({
   activeProject: null,
   projects: [],
   workspaces: [],
+  bootState: 'loading',  // 'loading' | 'no-workspace' | 'ready'
   setActiveWorkspace: () => {},
   setActiveProject: () => {},
+  addWorkspace: () => {},
   refreshProjects: () => {},
-  isBooting: true,
 });
 
 export function useApp() {
@@ -23,16 +24,13 @@ export function AppContextProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [activeWorkspace, setActiveWorkspaceState] = useState(null);
   const [activeProject, setActiveProjectState] = useState(null);
-  const [isBooting, setIsBooting] = useState(true);
+  const [bootState, setBootState] = useState('loading');
 
-  // Load projects for a given workspace
   const loadProjects = useCallback(async (workspaceId, savedProjectId = null) => {
     try {
       const result = await getProjects(workspaceId);
       const list = result.data || [];
       setProjects(list);
-
-      // Pick saved project or first
       const saved = savedProjectId ? list.find((p) => p.id === savedProjectId) : null;
       const active = saved || list[0] || null;
       setActiveProjectState(active);
@@ -45,7 +43,6 @@ export function AppContextProvider({ children }) {
     }
   }, []);
 
-  // Boot: fetch workspaces, restore from localStorage
   useEffect(() => {
     const boot = async () => {
       try {
@@ -57,7 +54,7 @@ export function AppContextProvider({ children }) {
         setWorkspaces(list);
 
         if (list.length === 0) {
-          setIsBooting(false);
+          setBootState('no-workspace');
           return;
         }
 
@@ -65,12 +62,11 @@ export function AppContextProvider({ children }) {
         const ws = saved || list[0];
         setActiveWorkspaceState(ws);
         localStorage.setItem('activeWorkspaceId', ws.id);
-
         await loadProjects(ws.id, savedPjId);
+        setBootState('ready');
       } catch (err) {
         console.error('[AppContext] boot error:', err);
-      } finally {
-        setIsBooting(false);
+        setBootState('no-workspace');
       }
     };
     boot();
@@ -85,6 +81,19 @@ export function AppContextProvider({ children }) {
     await loadProjects(ws.id);
   }, [loadProjects]);
 
+  /** Called after a successful POST /workspaces — appends and switches. */
+  const addWorkspace = useCallback(async (ws) => {
+    setWorkspaces((prev) => [...prev, ws]);
+    setActiveWorkspaceState(ws);
+    setActiveProjectState(null);
+    setProjects([]);
+    localStorage.setItem('activeWorkspaceId', ws.id);
+    localStorage.removeItem('activeProjectId');
+    setBootState('ready');
+    // Projects will be empty → sidebar auto-opens project form
+    await loadProjects(ws.id);
+  }, [loadProjects]);
+
   const setActiveProject = useCallback((project) => {
     setActiveProjectState(project);
     if (project) localStorage.setItem('activeProjectId', project.id);
@@ -92,8 +101,7 @@ export function AppContextProvider({ children }) {
 
   const refreshProjects = useCallback(async () => {
     if (!activeWorkspace) return;
-    const savedPjId = activeProject?.id;
-    await loadProjects(activeWorkspace.id, savedPjId);
+    await loadProjects(activeWorkspace.id, activeProject?.id);
   }, [activeWorkspace, activeProject, loadProjects]);
 
   return (
@@ -102,10 +110,11 @@ export function AppContextProvider({ children }) {
       activeProject,
       workspaces,
       projects,
+      bootState,
       setActiveWorkspace,
       setActiveProject,
+      addWorkspace,
       refreshProjects,
-      isBooting,
     }}>
       {children}
     </AppContext.Provider>

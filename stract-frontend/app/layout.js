@@ -1,8 +1,8 @@
 import { GeistSans } from 'geist/font/sans';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
-import Sidebar from '@/components/Navbar';
 import { AppContextProvider } from '@/context/AppContext';
+import BootGate from '@/components/BootGate';
 import "./globals.css";
 
 export const metadata = {
@@ -16,10 +16,9 @@ export default function RootLayout({ children }) {
       <body className="font-sans antialiased bg-[#fafaf8] text-[#1a1a1a]">
         <TooltipProvider delayDuration={300}>
           <AppContextProvider>
-            <Sidebar />
-            <div className="ml-[220px] min-h-screen">
+            <BootGate>
               {children}
-            </div>
+            </BootGate>
             <Toaster
               position="bottom-right"
               duration={3500}

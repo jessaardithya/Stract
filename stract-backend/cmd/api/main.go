@@ -75,28 +75,8 @@ func main() {
 	wsGroup.Use(middleware.RequireWorkspaceMember(db))
 
 	// Workspace detail
-	wsGroup.GET("", func(c *gin.Context) {
-		// Delegate to the workspace handler
-		wsID := c.Param("workspace_id")
-		var w struct {
-			ID          string  `json:"id"`
-			Name        string  `json:"name"`
-			Slug        string  `json:"slug"`
-			Description string  `json:"description"`
-			OwnerID     string  `json:"owner_id"`
-			CreatedAt   string  `json:"created_at"`
-			ArchivedAt  *string `json:"archived_at"`
-		}
-		err := db.QueryRow(context.Background(),
-			`SELECT id, name, slug, COALESCE(description,''), owner_id, created_at::text, archived_at::text
-			 FROM stract.workspaces WHERE id = $1 AND archived_at IS NULL`, wsID,
-		).Scan(&w.ID, &w.Name, &w.Slug, &w.Description, &w.OwnerID, &w.CreatedAt, &w.ArchivedAt)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"data": w})
-	})
+	wsHandler := workspaces.NewHandler(db)
+	wsGroup.GET("", wsHandler.GetWorkspace)
 
 	// Projects under workspace
 	projectGroup := wsGroup.Group("/projects")

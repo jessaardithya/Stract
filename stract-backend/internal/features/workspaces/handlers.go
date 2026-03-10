@@ -43,7 +43,6 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
 	h := NewHandler(db)
 	router.POST("/workspaces", h.CreateWorkspace)
 	router.GET("/workspaces", h.ListWorkspaces)
-	router.GET("/workspaces/:workspace_id", h.GetWorkspace)
 }
 
 // CreateWorkspace handles POST /api/v1/workspaces.
