@@ -90,7 +90,7 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
                 ) : (
                   <div className="flex items-center gap-1.5 flex-1 min-w-0">
                     <Tooltip>
-                      <TooltipTrigger asChild>
+                      <TooltipTrigger className="flex shrink-0">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityCfg.dot}`} />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">{priorityCfg.label} priority</TooltipContent>
@@ -107,24 +107,20 @@ export default function TaskCard({ task, index, onDelete, onRename }) {
                 {!isEditing && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                          className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-violet-500 hover:bg-violet-50 transition-colors"
-                        >
-                          <Pencil size={12} />
-                        </button>
+                      <TooltipTrigger
+                        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                        className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                      >
+                        <Pencil size={12} />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">Edit title</TooltipContent>
                     </Tooltip>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-                          className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                      <TooltipTrigger
+                        onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                        className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={12} />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">Delete task</TooltipContent>
                     </Tooltip>
