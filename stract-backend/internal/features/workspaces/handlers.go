@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{1,46}[a-z0-9]$`)
@@ -32,14 +32,14 @@ type CreateWorkspaceRequest struct {
 }
 
 type Handler struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
-func NewHandler(db *pgx.Conn) *Handler { return &Handler{DB: db} }
+func NewHandler(db *pgxpool.Pool) *Handler { return &Handler{DB: db} }
 
 // RegisterRoutes mounts workspace routes on the given router group.
 // The group must already have the Auth middleware applied.
-func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.POST("/workspaces", h.CreateWorkspace)
 	router.GET("/workspaces", h.ListWorkspaces)

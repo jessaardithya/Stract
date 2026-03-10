@@ -153,6 +153,7 @@ export default function Sidebar() {
   const [wsSettingsOpen, setWsSettingsOpen] = useState(false);
   const [editWsName, setEditWsName] = useState('');
   const [isUpdatingWs, setIsUpdatingWs] = useState(false);
+  const [wsDeleteAlertOpen, setWsDeleteAlertOpen] = useState(false);
   const [isDeletingWs, setIsDeletingWs] = useState(false);
 
   const openWsSettings = (e) => {
@@ -632,7 +633,7 @@ export default function Sidebar() {
               <label className="text-sm font-medium text-red-600 block mb-1.5">Danger Zone</label>
               <p className="text-xs text-gray-500 mb-3">Deleting a workspace will immediately delete all of its projects and tasks. This cannot be undone.</p>
               <button
-                onClick={() => setIsDeletingWs(true)}
+                onClick={() => setWsDeleteAlertOpen(true)}
                 className="w-full flex items-center justify-center gap-2 px-3 h-9 rounded-md text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
               >
                 Delete Workspace
@@ -649,7 +650,7 @@ export default function Sidebar() {
       </Dialog>
 
       {/* Delete Workspace Confirm */}
-      <AlertDialog open={isDeletingWs} onOpenChange={setIsDeletingWs}>
+      <AlertDialog open={wsDeleteAlertOpen} onOpenChange={setWsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

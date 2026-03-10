@@ -36,7 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to the database: %v\n", err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	broker := stream.NewBroker()
 	events.SetBroker(broker)

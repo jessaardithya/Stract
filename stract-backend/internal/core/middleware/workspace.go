@@ -5,13 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RequireWorkspaceMember is a Gin middleware that enforces workspace membership.
 // It must run after Auth() so that user_id is already in the context.
 // On success it injects workspace_role and workspace_id into the Gin context.
-func RequireWorkspaceMember(db *pgx.Conn) gin.HandlerFunc {
+func RequireWorkspaceMember(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		workspaceID := c.Param("workspace_id")
 		userID, exists := c.Get("user_id")

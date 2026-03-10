@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"stract-backend/internal/core/events"
 )
 
 // Handler holds the dependencies for task routes (like the database connection).
 type Handler struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
 // Task represents a task in the database
@@ -51,7 +51,7 @@ type UpdateTaskRequest struct {
 }
 
 // RegisterRoutes binds the legacy (non-workspace) task endpoints — kept for backward compat.
-func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := &Handler{DB: db}
 
 	tasksGroup := router.Group("/tasks")
@@ -66,7 +66,7 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
 
 // RegisterWorkspaceRoutes binds workspace-scoped task endpoints.
 // The router group must already have Auth + RequireWorkspaceMember middleware applied.
-func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := &Handler{DB: db}
 
 	tasksGroup := router.Group("/tasks")

@@ -5,13 +5,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // StartJanitor runs a background loop that hard-deletes soft-deleted tasks older than 30 days.
 // It accepts a context for graceful shutdown, a pgx connection, and a configurable interval.
 // Call as: go workers.StartJanitor(ctx, db, 12*time.Hour)
-func StartJanitor(ctx context.Context, db *pgx.Conn, interval time.Duration) {
+func StartJanitor(ctx context.Context, db *pgxpool.Pool, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -30,7 +30,7 @@ func StartJanitor(ctx context.Context, db *pgx.Conn, interval time.Duration) {
 }
 
 // runJanitor performs one cleanup pass.
-func runJanitor(ctx context.Context, db *pgx.Conn) {
+func runJanitor(ctx context.Context, db *pgxpool.Pool) {
 	log.Println("[JANITOR] run started")
 
 	// Hard-delete tasks soft-deleted 30+ days ago

@@ -7,7 +7,7 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var hexColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -45,12 +45,12 @@ type UpdateProjectRequest struct {
 }
 
 type Handler struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
-func NewHandler(db *pgx.Conn) *Handler { return &Handler{DB: db} }
+func NewHandler(db *pgxpool.Pool) *Handler { return &Handler{DB: db} }
 
-func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("", h.ListProjects)
 	router.POST("", h.CreateProject)

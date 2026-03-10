@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Summary is the legacy analytics response (backward compat for /api/v1/analytics/summary).
@@ -33,7 +33,7 @@ type WorkspaceSummary struct {
 
 // Handler holds db and a 60-second in-memory cache.
 type Handler struct {
-	DB          *pgx.Conn
+	DB          *pgxpool.Pool
 	mu          sync.Mutex
 	cachedAt    time.Time
 	cachedValue *Summary
@@ -48,7 +48,7 @@ type wsCacheEntry struct {
 	cachedAt  time.Time
 }
 
-func NewHandler(db *pgx.Conn) *Handler {
+func NewHandler(db *pgxpool.Pool) *Handler {
 	return &Handler{
 		DB:      db,
 		wsCache: make(map[string]*wsCacheEntry),
@@ -56,13 +56,13 @@ func NewHandler(db *pgx.Conn) *Handler {
 }
 
 // RegisterRoutes mounts the legacy analytics endpoint (kept for backward compat).
-func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("/analytics/summary", h.GetSummary)
 }
 
 // RegisterWorkspaceRoutes mounts the project-scoped analytics endpoint.
-func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("/analytics/summary", h.GetWorkspaceSummary)
 }
