@@ -41,7 +41,14 @@ import {
   Globe,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { createProject, createWorkspace } from '@/lib/api';
+import {
+  createProject,
+  createWorkspace,
+  updateProject,
+  deleteProject,
+  updateWorkspace,
+  deleteWorkspace,
+} from '@/lib/api';
 import { deriveSlug } from '@/utils/slug';
 
 const PRESET_COLORS = [
