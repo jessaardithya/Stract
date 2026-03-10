@@ -25,12 +25,16 @@ type Task struct {
 	Position    float64 `json:"position"`
 	CreatorID   string  `json:"creator_id"`
 	LastMovedAt string  `json:"last_moved_at"`
+	ProjectID   string  `json:"project_id"`
+	Priority    string  `json:"priority"`
 }
 
 // CreateTaskRequest represents the payload for creating a task
 type CreateTaskRequest struct {
-	Title  string `json:"title" binding:"required"`
-	Status string `json:"status" binding:"required"`
+	Title     string `json:"title" binding:"required"`
+	Status    string `json:"status" binding:"required"`
+	ProjectID string `json:"project_id"`
+	Priority  string `json:"priority"`
 }
 
 // UpdatePositionRequest represents the payload for updating a task's position and status.
@@ -46,7 +50,7 @@ type UpdateTaskRequest struct {
 	Title string `json:"title" binding:"required"`
 }
 
-// RegisterRoutes binds the task-specific HTTP endpoints to the router.
+// RegisterRoutes binds the legacy (non-workspace) task endpoints — kept for backward compat.
 func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
 	h := &Handler{DB: db}
 
@@ -57,6 +61,21 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgx.Conn) {
 		tasksGroup.PATCH("/:id", h.UpdateTask)
 		tasksGroup.PATCH("/:id/position", h.UpdateTaskPosition)
 		tasksGroup.DELETE("/:id", h.DeleteTask)
+	}
+}
+
+// RegisterWorkspaceRoutes binds workspace-scoped task endpoints.
+// The router group must already have Auth + RequireWorkspaceMember middleware applied.
+func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgx.Conn) {
+	h := &Handler{DB: db}
+
+	tasksGroup := router.Group("/tasks")
+	{
+		tasksGroup.GET("", h.WorkspaceListTasks)
+		tasksGroup.POST("", h.WorkspaceCreateTask)
+		tasksGroup.PATCH("/:id", h.UpdateTask) // title-only update, no chain validation needed
+		tasksGroup.PATCH("/:id/position", h.WorkspaceUpdateTaskPosition)
+		tasksGroup.DELETE("/:id", h.WorkspaceDeleteTask)
 	}
 }
 

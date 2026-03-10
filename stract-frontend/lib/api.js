@@ -1,77 +1,99 @@
 const API_BASE = 'http://localhost:8080/api/v1';
 
 function getHeaders() {
-  const token = localStorage.getItem('token');
-  const headers = {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+  return {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
 }
 
 async function handleResponse(res) {
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed with status ${res.status}`);
-  }
+  if (!res.ok) throw new Error(data.error || `Request failed with status ${res.status}`);
   return data;
 }
 
-export async function fetchTasks() {
-  const res = await fetch(`${API_BASE}/tasks`, {
-    headers: getHeaders(),
-  });
-  return handleResponse(res);
+// ── Workspaces ────────────────────────────────────────────────────────────────
+
+export function getWorkspaces() {
+  return fetch(`${API_BASE}/workspaces`, { headers: getHeaders() }).then(handleResponse);
 }
 
-export async function createTask(title, status, position) {
-  const res = await fetch(`${API_BASE}/tasks`, {
+export function createWorkspace(data) {
+  return fetch(`${API_BASE}/workspaces`, {
+    method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+}
+
+// ── Projects ─────────────────────────────────────────────────────────────────
+
+export function getProjects(workspaceId) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects`, { headers: getHeaders() }).then(handleResponse);
+}
+
+export function createProject(workspaceId, data) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects`, {
+    method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+}
+
+export function updateProject(workspaceId, id, data) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects/${id}`, {
+    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+}
+
+export function deleteProject(workspaceId, id) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects/${id}`, {
+    method: 'DELETE', headers: getHeaders(),
+  }).then(handleResponse);
+}
+
+// ── Tasks (workspace-scoped) ──────────────────────────────────────────────────
+
+export function getTasks(workspaceId, projectId, filters = {}) {
+  const params = new URLSearchParams({ project_id: projectId, ...filters });
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks?${params}`, { headers: getHeaders() }).then(handleResponse);
+}
+
+export function createTask(workspaceId, projectId, title, status, priority = 'medium') {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ title, status, position }),
-  });
-  return handleResponse(res);
+    body: JSON.stringify({ title, status, project_id: projectId, priority }),
+  }).then(handleResponse);
 }
 
-export async function deleteTask(id) {
-  const res = await fetch(`${API_BASE}/tasks/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders(),
-  });
-  return handleResponse(res);
+export function updateTask(workspaceId, id, title) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}`, {
+    method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ title }),
+  }).then(handleResponse);
 }
 
-export async function updateTaskPosition(id, status, prevPos, nextPos) {
+export function updateTaskPosition(workspaceId, id, status, prevPos, nextPos) {
   const body = { status, prev_pos: prevPos };
-  // Only include next_pos when defined — backend interprets absence as "dropped at bottom"
-  if (nextPos !== null && nextPos !== undefined) {
-    body.next_pos = nextPos;
-  }
-  const res = await fetch(`${API_BASE}/tasks/${id}/position`, {
-    method: 'PATCH',
-    headers: getHeaders(),
-    body: JSON.stringify(body),
-  });
-  return handleResponse(res);
+  if (nextPos !== null && nextPos !== undefined) body.next_pos = nextPos;
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}/position`, {
+    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(body),
+  }).then(handleResponse);
 }
 
-export async function updateTask(id, title) {
-  const res = await fetch(`${API_BASE}/tasks/${id}`, {
-    method: 'PATCH',
-    headers: getHeaders(),
-    body: JSON.stringify({ title }),
-  });
-  return handleResponse(res);
+export function deleteTask(workspaceId, id) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}`, {
+    method: 'DELETE', headers: getHeaders(),
+  }).then(handleResponse);
 }
 
-export async function fetchAnalytics() {
-  const res = await fetch(`${API_BASE}/analytics/summary`, {
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export function getAnalytics(workspaceId, projectId) {
+  return fetch(`${API_BASE}/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`, {
     headers: getHeaders(),
-  });
-  return handleResponse(res);
+  }).then(handleResponse);
 }
 
-
-
+// Legacy — used by SSE hook (non-workspace-scoped)
+export function fetchAnalytics() {
+  return fetch(`${API_BASE}/analytics/summary`, { headers: getHeaders() }).then(handleResponse);
+}

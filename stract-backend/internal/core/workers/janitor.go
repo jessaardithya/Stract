@@ -33,13 +33,24 @@ func StartJanitor(ctx context.Context, db *pgx.Conn, interval time.Duration) {
 func runJanitor(ctx context.Context, db *pgx.Conn) {
 	log.Println("[JANITOR] run started")
 
+	// Hard-delete tasks soft-deleted 30+ days ago
 	tag, err := db.Exec(ctx,
 		"DELETE FROM stract.tasks WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '30 days'",
 	)
 	if err != nil {
-		log.Printf("[JANITOR] error during cleanup: %v", err)
-		return
+		log.Printf("[JANITOR] task cleanup error: %v", err)
+	} else {
+		log.Printf("[JANITOR] deleted %d stale tasks", tag.RowsAffected())
 	}
 
-	log.Printf("[JANITOR] deleted %d tasks", tag.RowsAffected())
+	// Hard-delete projects archived 30+ days ago (tasks cascade via ON DELETE CASCADE)
+	ptag, err := db.Exec(ctx,
+		"DELETE FROM stract.projects WHERE archived_at IS NOT NULL AND archived_at < NOW() - INTERVAL '30 days'",
+	)
+	if err != nil {
+		log.Printf("[JANITOR] project cleanup error: %v", err)
+	} else {
+		log.Printf("[JANITOR] deleted %d archived projects", ptag.RowsAffected())
+	}
 }
+

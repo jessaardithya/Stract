@@ -26,7 +26,7 @@ const COLUMN_CONFIG = {
   },
 };
 
-export default function Column({ status, tasks, onDelete, onRename, onTaskAdded, onError }) {
+export default function Column({ status, tasks, onDelete, onRename, onTaskAdded, onError, activeWorkspace, activeProject }) {
   const cfg = COLUMN_CONFIG[status] || COLUMN_CONFIG['todo'];
 
   return (
@@ -84,6 +84,8 @@ export default function Column({ status, tasks, onDelete, onRename, onTaskAdded,
         taskCount={tasks.length}
         onTaskAdded={onTaskAdded}
         onError={onError}
+        activeWorkspace={activeWorkspace}
+        activeProject={activeProject}
       />
     </div>
   );

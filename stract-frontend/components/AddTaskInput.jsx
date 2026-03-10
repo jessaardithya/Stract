@@ -4,21 +4,30 @@ import { useState } from 'react';
 import { Plus, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { createTask } from '@/lib/api';
 
-export default function AddTaskInput({ status, taskCount, onTaskAdded, onError }) {
+export default function AddTaskInput({ status, onTaskAdded, onError, activeWorkspace, activeProject }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
+  const [priority, setPriority] = useState('medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     const trimmed = title.trim();
-    if (!trimmed) return;
+    if (!trimmed || !activeWorkspace?.id || !activeProject?.id) return;
     setIsSubmitting(true);
     try {
-      const result = await createTask(trimmed, status, taskCount * 1000);
+      const result = await createTask(activeWorkspace.id, activeProject.id, trimmed, status, priority);
       onTaskAdded(result.data);
       setTitle('');
+      setPriority('medium');
       setIsEditing(false);
     } catch (err) {
       onError(err.message);
@@ -27,7 +36,7 @@ export default function AddTaskInput({ status, taskCount, onTaskAdded, onError }
     }
   };
 
-  const handleCancel = () => { setTitle(''); setIsEditing(false); };
+  const handleCancel = () => { setTitle(''); setPriority('medium'); setIsEditing(false); };
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSubmit();
     if (e.key === 'Escape') handleCancel();
@@ -59,6 +68,33 @@ export default function AddTaskInput({ status, taskCount, onTaskAdded, onError }
         className="text-sm bg-white h-9 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
       />
       <div className="flex items-center gap-2 mt-2">
+        {/* Priority selector */}
+        <Select value={priority} onValueChange={setPriority} disabled={isSubmitting}>
+          <SelectTrigger className="h-7 text-xs w-[100px] border-[#e4e4e0] focus:ring-violet-300">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                Low
+              </span>
+            </SelectItem>
+            <SelectItem value="medium">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                Medium
+              </span>
+            </SelectItem>
+            <SelectItem value="high">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                High
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button
           size="sm"
           onClick={handleSubmit}
