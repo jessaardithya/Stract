@@ -157,6 +157,66 @@ func (h *Handler) GetWorkspace(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": w})
 }
 
+// UpdateWorkspaceRequest is the body for PATCH /workspaces/:workspace_id.
+type UpdateWorkspaceRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+// UpdateWorkspace handles PATCH /api/v1/workspaces/:workspace_id.
+// Requires RequireWorkspaceMember middleware upstream.
+func (h *Handler) UpdateWorkspace(c *gin.Context) {
+	workspaceID := c.Param("workspace_id")
+	userID, _ := c.Get("user_id")
+
+	var req UpdateWorkspaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Only allow owner to update
+	var w Workspace
+	err := h.DB.QueryRow(context.Background(),
+		`UPDATE stract.workspaces
+		 SET
+		   name        = COALESCE($1, name),
+		   description = COALESCE($2, description)
+		 WHERE id = $3 AND owner_id = $4
+		 RETURNING id, name, slug, COALESCE(description,''), owner_id, created_at::text, archived_at::text`,
+		req.Name, req.Description, workspaceID, userID,
+	).Scan(&w.ID, &w.Name, &w.Slug, &w.Description, &w.OwnerID, &w.CreatedAt, &w.ArchivedAt)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "workspace not found or you are not the owner"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": w})
+}
+
+// ArchiveWorkspace handles DELETE /api/v1/workspaces/:workspace_id.
+// Requires RequireWorkspaceMember middleware upstream.
+// Soft-deletes by setting archived_at = NOW(). Only the owner can archive.
+func (h *Handler) ArchiveWorkspace(c *gin.Context) {
+	workspaceID := c.Param("workspace_id")
+	userID, _ := c.Get("user_id")
+
+	var w Workspace
+	err := h.DB.QueryRow(context.Background(),
+		`UPDATE stract.workspaces
+		 SET archived_at = NOW()
+		 WHERE id = $1 AND owner_id = $2
+		 RETURNING id, name, slug, COALESCE(description,''), owner_id, created_at::text, archived_at::text`,
+		workspaceID, userID,
+	).Scan(&w.ID, &w.Name, &w.Slug, &w.Description, &w.OwnerID, &w.CreatedAt, &w.ArchivedAt)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "workspace not found or you are not the owner"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": w})
+}
+
 // isUniqueViolation detects Postgres unique constraint errors from pgx.
 func isUniqueViolation(err error) bool {
 	return err != nil && len(err.Error()) > 0 &&
@@ -178,3 +238,4 @@ func containsStr(s, sub string) bool {
 
 // ensure time import is used (for future TTL work)
 var _ = time.Now
+

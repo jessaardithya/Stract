@@ -74,9 +74,11 @@ func main() {
 	wsGroup := apiV1.Group("/workspaces/:workspace_id")
 	wsGroup.Use(middleware.RequireWorkspaceMember(db))
 
-	// Workspace detail
+	// Workspace detail & management
 	wsHandler := workspaces.NewHandler(db)
 	wsGroup.GET("", wsHandler.GetWorkspace)
+	wsGroup.PATCH("", wsHandler.UpdateWorkspace)
+	wsGroup.DELETE("", wsHandler.ArchiveWorkspace)
 
 	// Projects under workspace
 	projectGroup := wsGroup.Group("/projects")

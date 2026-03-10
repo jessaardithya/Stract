@@ -26,6 +26,18 @@ export function createWorkspace(data) {
   }).then(handleResponse);
 }
 
+export function updateWorkspace(id, data) {
+  return fetch(`${API_BASE}/workspaces/${id}`, {
+    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+}
+
+export function deleteWorkspace(id) {
+  return fetch(`${API_BASE}/workspaces/${id}`, {
+    method: 'DELETE', headers: getHeaders(),
+  }).then(handleResponse);
+}
+
 // ── Projects ─────────────────────────────────────────────────────────────────
 
 export function getProjects(workspaceId) {
