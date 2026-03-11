@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ import {
   Building2,
   Loader2,
   Globe,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
@@ -60,10 +62,6 @@ const BOTTOM_NAV = [
   { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];
-
-import { useRouter } from 'next/navigation';
-
-// ... (imports will be fixed in a subsequent cleanup if needed, but assuming standard layout, we just add to the existing imports)
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -320,6 +318,18 @@ export default function Sidebar() {
                 >
                   <Plus size={13} />
                   New Workspace
+                </button>
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    localStorage.removeItem('activeWorkspaceId');
+                    localStorage.removeItem('activeProjectId');
+                    router.push('/login');
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"
+                >
+                  <LogOut size={13} />
+                  Sign out
                 </button>
               </div>
             </PopoverContent>

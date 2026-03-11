@@ -3,6 +3,9 @@
 import { useApp } from '@/context/AppContext';
 import CreateWorkspace from '@/components/onboarding/CreateWorkspace';
 import Sidebar from '@/components/Navbar';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const COLUMN_SKELETONS = 3;
 
@@ -37,12 +40,41 @@ function FullPageSkeleton() {
 
 export default function BootGate({ children }) {
   const { bootState } = useApp();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/auth/callback';
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && !isAuthPage) {
+        router.replace('/login');
+      } else if (session && isAuthPage) {
+        window.location.href = '/'; 
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [isAuthPage, router]);
 
   if (bootState === 'loading') {
     return <FullPageSkeleton />;
   }
 
+  if (bootState === 'unauthenticated') {
+    if (!isAuthPage) {
+      // Avoid flash of content while redirecting
+      return <FullPageSkeleton />;
+    }
+    return children;
+  }
+
+  // If we have a session but we're on an auth page, redirect to home
+  if (isAuthPage && bootState !== 'unauthenticated') {
+    return <FullPageSkeleton />;
+  }
+
   if (bootState === 'no-workspace') {
+    if (isAuthPage) return children; // Escape hatch for callback
     return <CreateWorkspace />;
   }
 

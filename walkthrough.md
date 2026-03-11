@@ -1,31 +1,27 @@
 # Stract Kanban — Today's Walkthrough (Mar 10)
 
----
-
-## 1. Database Connection Fix
-**Problem:** DNS failures to Supabase.
-**Fix:** Switched to Connection Pooler URL (`pooler.supabase.com:6543`).
-
-## 2. Drag-and-Drop 400 Error Fix
-**Problem:** `Position 0` rejected by Gin.
-**Fix:** Removed `binding:"required"` from Position fields.
-
-## 3. UI Redesign — Light Theme & shadcn/ui
-**Implementation:** Replaced dark zinc with soft gray `#fafaf8`. Installed `shadcn/ui` (Button, Badge, Card, Input, Separator, Tooltip, Avatar) and Geist font. Warm Linear-style aesthetic.
+*(Prior phases 1-5 documented below)*
 
 ---
 
-## 4. Phase 4 — Insights & Live Sync
+## 6. Phase 6 — Workspace & Project Management UI
 
-### Real-time Synchronization (SSE)
-- **Backend:** `internal/core/stream/broker.go` manages client connections. `GET /api/v1/stream` pipes events to browsers.
-- **Frontend:** `useRealtime.js` hook listens for `created`, `moved`, `deleted`, and `updated` events.
-- **Notifications:** shadcn `Sonner` toasts show live updates (e.g., "'Task A' moved to in progress").
+### Project Accordion UX & Routing
+- **Problem:** Clicking a project in the sidebar while on the Dashboard didn't actually navigate the user back to the Board to see their tasks.
+- **Solution:** Replaced the simple project list with an **Accordion** style menu.
+  - Clicking a project immediately navigates to `/` (the Kanban Board).
+  - The active project expands vertically in the sidebar to reveal two sub-buttons: `Kanban Board` and `Project Settings`.
 
-### Analytics Dashboard
-- **Backend:** `GET /api/v1/analytics/summary` computes velocity (7d), stale counts (3d+), and backlog health.
-- **Frontend:** `/dashboard` page with KPI cards and a status distribution bar.
-- **Task Staleness:** Cards show age indicators (e.g., "3 days ago") with color-coded "Flame" icons for stale tasks.
+### Project Edit & Delete
+- Added a `Project Settings` dialog using `shadcn` components.
+- Users can now rename their project or change its color badge on the fly.
+- Included a red "Danger Zone" button that triggers a secondary `AlertDialog` to safely confirm dropping the project (and all its tasks).
+
+### Workspace Edit & Delete
+- **Backend:** Added `PATCH` and `DELETE` endpoints to `internal/features/workspaces/handlers.go`.
+- **Frontend:** Inserted a Settings cog icon directly into the Workspace Switcher popover header.
+- Users can now rename their workspace.
+- Added a destructive Workspace Deletion flow. If a workspace is deleted, the app gracefully falls back to the "Create Workspace" empty state.
 
 ---
 
@@ -45,13 +41,19 @@
 | **New Project** | Inline creation in sidebar with name input and 8 preset color swatches. |
 | **Dashboard v2** | Added "Priority Breakdown" and "Completion Rate" cards. Filtered by active workspace/project. |
 
-### Bug Fix: Hydration Error (Nested Buttons)
-**Problem:** Next.js reported a hydration error: `<button> cannot be a descendant of <button>`.
-**Fix:** Removed the nested `<button>` inside `PopoverTrigger asChild`. Since shadcn v4's `PopoverTrigger` (Base UI) already renders a button, I styled it directly instead of using a redundant inner button.
+---
 
-### Bug Fix: Route Collision Panic
-**Problem:** Backend panicked on start due to duplicate registration of `GET /api/v1/workspaces/:workspace_id`.
-**Fix:** Consolidated the route under the gated `RequireWorkspaceMember` group. Verified with `go build`.
+## 4. Phase 4 — Insights & Live Sync
+
+### Real-time Synchronization (SSE)
+- **Backend:** `internal/core/stream/broker.go` manages client connections. `GET /api/v1/stream` pipes events to browsers.
+- **Frontend:** `useRealtime.js` hook listens for `created`, `moved`, `deleted`, and `updated` events.
+- **Notifications:** shadcn `Sonner` toasts show live updates.
+
+### Analytics Dashboard
+- **Backend:** `GET /api/v1/analytics/summary` computes velocity, stale counts, and backlog health.
+- **Frontend:** `/dashboard` page with KPI cards and a status distribution bar.
+- **Task Staleness:** Cards show age indicators (e.g., "3 days ago") with color-coded "Flame" icons for stale tasks.
 
 ---
 
@@ -59,6 +61,6 @@
 
 | Target | Status |
 |--------|--------|
-| `go build ./cmd/api` | ✅ Clean (including Phase 5) |
+| `go build ./cmd/api` | ✅ Clean |
 | `npm run build` | ✅ Compiled (✓ / and /dashboard) |
-| `git push` | ✅ Head: `f140dbb` |
+| `git push` | ✅ Head: `c57925a` |

@@ -1,15 +1,25 @@
-const API_BASE = 'http://localhost:8080/api/v1';
+import { supabase } from './supabase';
 
-function getHeaders() {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-  return {
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+
+async function apiFetch(endpoint, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    ...options.headers,
   };
-}
 
-async function handleResponse(res) {
-  const data = await res.json();
+  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  
+  if (res.status === 401) {
+    await supabase.auth.signOut();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }
+
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed with status ${res.status}`);
   return data;
 }
@@ -17,95 +27,74 @@ async function handleResponse(res) {
 // ── Workspaces ────────────────────────────────────────────────────────────────
 
 export function getWorkspaces() {
-  return fetch(`${API_BASE}/workspaces`, { headers: getHeaders() }).then(handleResponse);
+  return apiFetch('/workspaces');
 }
 
 export function createWorkspace(data) {
-  return fetch(`${API_BASE}/workspaces`, {
-    method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
+  return apiFetch('/workspaces', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export function updateWorkspace(id, data) {
-  return fetch(`${API_BASE}/workspaces/${id}`, {
-    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
 export function deleteWorkspace(id) {
-  return fetch(`${API_BASE}/workspaces/${id}`, {
-    method: 'DELETE', headers: getHeaders(),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${id}`, { method: 'DELETE' });
 }
 
 // ── Projects ─────────────────────────────────────────────────────────────────
 
 export function getProjects(workspaceId) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects`, { headers: getHeaders() }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/projects`);
 }
 
 export function createProject(workspaceId, data) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects`, {
-    method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/projects`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export function updateProject(workspaceId, id, data) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects/${id}`, {
-    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
 export function deleteProject(workspaceId, id) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/projects/${id}`, {
-    method: 'DELETE', headers: getHeaders(),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/projects/${id}`, { method: 'DELETE' });
 }
 
 // ── Tasks (workspace-scoped) ──────────────────────────────────────────────────
 
 export function getTasks(workspaceId, projectId, filters = {}) {
   const params = new URLSearchParams({ project_id: projectId, ...filters });
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks?${params}`, { headers: getHeaders() }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/tasks?${params}`);
 }
 
 export function createTask(workspaceId, projectId, title, status, priority = 'medium') {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks`, {
+  return apiFetch(`/workspaces/${workspaceId}/tasks`, {
     method: 'POST',
-    headers: getHeaders(),
     body: JSON.stringify({ title, status, project_id: projectId, priority }),
-  }).then(handleResponse);
+  });
 }
 
 export function updateTask(workspaceId, id, title) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}`, {
-    method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ title }),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
 }
 
 export function updateTaskPosition(workspaceId, id, status, prevPos, nextPos) {
   const body = { status, prev_pos: prevPos };
   if (nextPos !== null && nextPos !== undefined) body.next_pos = nextPos;
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}/position`, {
-    method: 'PATCH', headers: getHeaders(), body: JSON.stringify(body),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${id}/position`, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export function deleteTask(workspaceId, id) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/tasks/${id}`, {
-    method: 'DELETE', headers: getHeaders(),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'DELETE' });
 }
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 export function getAnalytics(workspaceId, projectId) {
-  return fetch(`${API_BASE}/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`, {
-    headers: getHeaders(),
-  }).then(handleResponse);
+  return apiFetch(`/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`);
 }
 
 // Legacy — used by SSE hook (non-workspace-scoped)
 export function fetchAnalytics() {
-  return fetch(`${API_BASE}/analytics/summary`, { headers: getHeaders() }).then(handleResponse);
+  return apiFetch(`/analytics/summary`);
 }

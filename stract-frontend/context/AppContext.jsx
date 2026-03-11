@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getWorkspaces, getProjects } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 const AppContext = createContext({
   activeWorkspace: null,
   activeProject: null,
   projects: [],
   workspaces: [],
-  bootState: 'loading',  // 'loading' | 'no-workspace' | 'ready'
+  bootState: 'loading',  // 'loading' | 'unauthenticated' | 'no-workspace' | 'ready'
   setActiveWorkspace: () => {},
   setActiveProject: () => {},
   addWorkspace: () => {},
@@ -46,6 +47,12 @@ export function AppContextProvider({ children }) {
   useEffect(() => {
     const boot = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setBootState('unauthenticated');
+          return;
+        }
+
         const savedWsId = localStorage.getItem('activeWorkspaceId');
         const savedPjId = localStorage.getItem('activeProjectId');
 
