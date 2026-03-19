@@ -60,6 +60,32 @@ export function deleteProject(workspaceId, id) {
   return apiFetch(`/workspaces/${workspaceId}/projects/${id}`, { method: 'DELETE' });
 }
 
+// ── Project Statuses ─────────────────────────────────────────────────────────
+
+export function getStatuses(workspaceId, projectId) {
+  return apiFetch(`/workspaces/${workspaceId}/projects/${projectId}/statuses`);
+}
+
+export function createStatus(workspaceId, projectId, data) {
+  return apiFetch(`/workspaces/${workspaceId}/projects/${projectId}/statuses`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateStatus(workspaceId, projectId, statusId, data) {
+  return apiFetch(`/workspaces/${workspaceId}/projects/${projectId}/statuses/${statusId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteStatus(workspaceId, projectId, statusId) {
+  return apiFetch(`/workspaces/${workspaceId}/projects/${projectId}/statuses/${statusId}`, {
+    method: 'DELETE',
+  });
+}
+
 // ── Tasks (workspace-scoped) ──────────────────────────────────────────────────
 
 export function getTask(workspaceId, taskId) {
@@ -72,10 +98,10 @@ export function getTasks(workspaceId, projectId, filters = {}) {
   return apiFetch(`/workspaces/${workspaceId}/tasks?${params}`);
 }
 
-export function createTask(workspaceId, projectId, title, status, priority = 'medium', description = '') {
+export function createTask(workspaceId, projectId, title, statusId, priority = 'medium', description = '') {
   return apiFetch(`/workspaces/${workspaceId}/tasks`, {
     method: 'POST',
-    body: JSON.stringify({ title, status, project_id: projectId, priority, description }),
+    body: JSON.stringify({ title, status_id: statusId, project_id: projectId, priority, description }),
   });
 }
 
@@ -83,14 +109,53 @@ export function updateTask(workspaceId, id, data) {
   return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
-export function updateTaskPosition(workspaceId, id, status, prevPos, nextPos) {
-  const body = { status, prev_pos: prevPos };
+export function updateTaskPosition(workspaceId, id, statusId, prevPos, nextPos) {
+  const body = { status_id: statusId, prev_pos: prevPos };
   if (nextPos !== null && nextPos !== undefined) body.next_pos = nextPos;
   return apiFetch(`/workspaces/${workspaceId}/tasks/${id}/position`, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export function deleteTask(workspaceId, id) {
   return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'DELETE' });
+}
+
+// ── Subtasks ─────────────────────────────────────────────────────────────────
+
+export function getSubtasks(workspaceId, taskId) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks`);
+}
+
+export function createSubtask(workspaceId, taskId, data) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateSubtask(workspaceId, taskId, subtaskId, data) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteSubtask(workspaceId, taskId, subtaskId) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────────
+
+export function getActivity(workspaceId, taskId) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/activity`);
+}
+
+export function createComment(workspaceId, taskId, content) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}/activity/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
 }
 
 // ── Analytics ─────────────────────────────────────────────────────────────────

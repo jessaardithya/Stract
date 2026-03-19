@@ -806,7 +806,7 @@ export default function Sidebar() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            <AlertDialogDescription>
               <div>
                 This will permanently delete the{" "}
                 <strong>{projectToDelete?.name}</strong> project and all of its
@@ -927,7 +927,7 @@ export default function Sidebar() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            <AlertDialogDescription>
               <div>
                 This will permanently delete the{" "}
                 <strong>{activeWorkspace?.name}</strong> workspace, all of its

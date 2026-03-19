@@ -7,48 +7,110 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import TaskCard from './TaskCard';
 import AddTaskInput from './AddTaskInput';
+import { updateStatus, deleteStatus } from '@/lib/api';
+import { useState, useRef, useEffect } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
-const COLUMN_CONFIG = {
-  'todo': {
-    label: 'Todo',
-    dot: 'bg-[#9ca3af]',
-    dotBorder: 'border-[#9ca3af]',
-  },
-  'in-progress': {
-    label: 'In Progress',
-    dot: 'bg-[#3b82f6]',
-    dotBorder: 'border-[#3b82f6]',
-  },
-  'done': {
-    label: 'Done',
-    dot: 'bg-[#10b981]',
-    dotBorder: 'border-[#10b981]',
-  },
-};
+export default function Column({ statusId, statusName, statusColor, tasks, onDelete, onRename, onTaskAdded, onError, activeWorkspace, activeProject, onStatusUpdate }) {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(statusName);
+  const renameInputRef = useRef(null);
 
-export default function Column({ status, tasks, onDelete, onRename, onTaskAdded, onError, activeWorkspace, activeProject }) {
-  const cfg = COLUMN_CONFIG[status] || COLUMN_CONFIG['todo'];
+  useEffect(() => {
+    if (isRenaming) renameInputRef.current?.focus();
+  }, [isRenaming]);
+
+  const handleStatusRename = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === statusName) {
+      setIsRenaming(false);
+      setNewName(statusName);
+      return;
+    }
+    try {
+      await updateStatus(activeWorkspace.id, activeProject.id, statusId, { name: trimmed });
+      onStatusUpdate();
+      setIsRenaming(false);
+    } catch (err) {
+      toast.error(err.message);
+      setNewName(statusName);
+      setIsRenaming(false);
+    }
+  };
+
+  const handleStatusDelete = async () => {
+    if (tasks.length > 0) {
+      toast.error("Cannot delete a column that contains tasks.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete the '${statusName}' column?`)) return;
+    try {
+      await deleteStatus(activeWorkspace.id, activeProject.id, statusId);
+      onStatusUpdate();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   return (
     <div className="flex flex-col w-[300px] min-w-[300px] rounded-xl bg-[#f4f4f2] border border-[#e4e4e0] p-4 max-h-[calc(100vh-160px)]">
       {/* Column Header */}
       <div className="flex items-center justify-between mb-0">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-          <span className="text-sm font-medium text-gray-700">{cfg.label}</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor || '#9ca3af' }} />
+          {isRenaming ? (
+            <Input
+              ref={renameInputRef}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={handleStatusRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleStatusRename();
+                if (e.key === 'Escape') { setIsRenaming(false); setNewName(statusName); }
+              }}
+              className="h-7 text-sm font-medium px-1 bg-white border-[#e4e4e0] focus-visible:ring-violet-300"
+            />
+          ) : (
+            <span 
+              className="text-sm font-medium text-gray-700 truncate cursor-pointer hover:text-gray-900" 
+              onDoubleClick={() => setIsRenaming(true)}
+            >
+              {statusName}
+            </span>
+          )}
           <Badge variant="secondary" className="text-xs font-semibold px-1.5 min-w-[22px] h-5 flex items-center justify-center">
             {tasks.length}
           </Badge>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-[#8a8a85] hover:text-gray-700 hover:bg-[#e4e4e0]/60">
-          <MoreHorizontal size={15} />
-        </Button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger className="h-7 w-7 flex items-center justify-center text-[#8a8a85] hover:text-gray-700 hover:bg-[#e4e4e0]/60 rounded-lg transition-colors">
+            <MoreHorizontal size={15} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 bg-white border-[#e4e4e0]">
+            <DropdownMenuItem onClick={() => setIsRenaming(true)} className="text-xs">
+              Rename Column
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-[#e4e4e0]" />
+            <DropdownMenuItem onClick={handleStatusDelete} className="text-xs text-red-600 focus:text-red-600 focus:bg-red-50">
+              Delete Column
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Separator className="my-3 bg-[#e4e4e0]" />
 
       {/* Droppable area */}
-      <Droppable droppableId={status}>
+      <Droppable droppableId={statusId}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
@@ -80,7 +142,7 @@ export default function Column({ status, tasks, onDelete, onRename, onTaskAdded,
 
       {/* Add task */}
       <AddTaskInput
-        status={status}
+        statusId={statusId}
         taskCount={tasks.length}
         onTaskAdded={onTaskAdded}
         onError={onError}

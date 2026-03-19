@@ -26,11 +26,7 @@ type Project struct {
 }
 
 // TaskCounts holds per-status task counts for a project list item.
-type TaskCounts struct {
-	Todo       int `json:"todo"`
-	InProgress int `json:"in_progress"`
-	Done       int `json:"done"`
-}
+type TaskCounts map[string]int
 
 type CreateProjectRequest struct {
 	Name        string `json:"name" binding:"required,min=1,max=80"`
@@ -66,15 +62,19 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		`SELECT
 		   p.id, p.workspace_id, p.name, COALESCE(p.description,''), p.color, p.creator_id,
 		   p.created_at::text, p.archived_at::text,
-		   COUNT(t.id) FILTER (WHERE t.status = 'todo')         AS todo_count,
-		   COUNT(t.id) FILTER (WHERE t.status = 'in-progress')  AS in_progress_count,
-		   COUNT(t.id) FILTER (WHERE t.status = 'done')         AS done_count
+		   (
+		     SELECT COALESCE(jsonb_object_agg(ps.name, t_counts.cnt), '{}'::jsonb)
+		     FROM (
+		       SELECT status_id, COUNT(*) as cnt
+		       FROM stract.tasks
+		       WHERE project_id = p.id AND deleted_at IS NULL
+		       GROUP BY status_id
+		     ) t_counts
+		     JOIN stract.project_statuses ps ON ps.id = t_counts.status_id
+		   ) AS task_counts
 		 FROM stract.projects p
-		 LEFT JOIN stract.tasks t
-		   ON t.project_id = p.id AND t.deleted_at IS NULL
 		 WHERE p.workspace_id = $1
 		   AND p.archived_at IS NULL
-		 GROUP BY p.id
 		 ORDER BY p.created_at ASC`,
 		workspaceID,
 	)
@@ -91,7 +91,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		if err := rows.Scan(
 			&p.ID, &p.WorkspaceID, &p.Name, &p.Description, &p.Color, &p.CreatorID,
 			&p.CreatedAt, &p.ArchivedAt,
-			&p.TaskCounts.Todo, &p.TaskCounts.InProgress, &p.TaskCounts.Done,
+			&p.TaskCounts,
 		); err != nil {
 			log.Printf("[projects] scan error: %v", err)
 			continue

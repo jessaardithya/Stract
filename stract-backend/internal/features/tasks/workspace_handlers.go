@@ -10,15 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"stract-backend/internal/core/events"
+	"stract-backend/internal/features/activity"
 )
 
 // (Assignee and Task structs are in handlers.go)
 
-const workspaceTaskSelect = `
-SELECT t.id, t.project_id, t.creator_id, t.assignee_id,
-       t.title, t.description, t.status, COALESCE(t.priority,'medium'), t.label, t.position,
-       t.start_date::text, t.due_date::text,
-       COALESCE(t.last_moved_at::text,''), t.created_at::text, t.updated_at::text`
+// (Assignee and Task structs are in handlers.go)
+
 
 // WorkspaceListTasks handles GET /api/v1/workspaces/:workspace_id/tasks
 func (h *Handler) WorkspaceListTasks(c *gin.Context) {
@@ -41,13 +39,14 @@ func (h *Handler) WorkspaceListTasks(c *gin.Context) {
 
 	query := fullTaskSelect + ` FROM stract.tasks t
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.project_id = $1 AND t.deleted_at IS NULL`
 	args := []interface{}{projectID}
 	argIdx := 2
 
-	if status := c.Query("status"); status != "" {
-		query += fmt.Sprintf(" AND t.status = $%d", argIdx)
-		args = append(args, status)
+	if statusID := c.Query("status_id"); statusID != "" {
+		query += fmt.Sprintf(" AND t.status_id = $%d", argIdx)
+		args = append(args, statusID)
 		argIdx++
 	}
 	if priority := c.Query("priority"); priority != "" {
@@ -64,7 +63,7 @@ func (h *Handler) WorkspaceListTasks(c *gin.Context) {
 		argIdx++
 	}
 	_ = argIdx
-	query += " ORDER BY t.position ASC"
+	query += " ORDER BY ps.position ASC, t.position ASC"
 
 	rows, err := h.DB.Query(context.Background(), query, args...)
 	if err != nil {
@@ -98,9 +97,10 @@ func (h *Handler) WorkspaceGetTask(c *gin.Context) {
 
 	var t Task
 	err := h.DB.QueryRow(context.Background(),
-		fullTaskSelect+` FROM stract.tasks t
+		fullTaskSelect + ` FROM stract.tasks t
 		 JOIN stract.projects p ON p.id = t.project_id
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.id = $1 AND p.workspace_id = $2 AND t.deleted_at IS NULL`,
 		id, workspaceID,
 	)
@@ -127,11 +127,14 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 	}
 
 	// Validate status
-	if req.Status != nil {
-		switch *req.Status {
-		case "todo", "in-progress", "done":
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be one of: todo, in-progress, done"})
+	if req.StatusID != nil {
+		var exists bool
+		err := h.DB.QueryRow(context.Background(),
+			"SELECT EXISTS(SELECT 1 FROM stract.project_statuses WHERE id = $1 AND project_id = (SELECT project_id FROM stract.tasks WHERE id = $2))",
+			*req.StatusID, id,
+		).Scan(&exists)
+		if err != nil || !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status_id for this project"})
 			return
 		}
 	}
@@ -169,32 +172,33 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 	}
 
 	// Fetch old status for SSE
-	var oldStatus, taskTitle string
+	var oldStatusName, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
-		`SELECT t.status, t.title FROM stract.tasks t
+		`SELECT ps.name, t.title FROM stract.tasks t
 		 JOIN stract.projects p ON p.id = t.project_id
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.id = $1 AND p.workspace_id = $2 AND t.deleted_at IS NULL`,
 		id, workspaceID,
-	).Scan(&oldStatus, &taskTitle)
+	).Scan(&oldStatusName, &taskTitle)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "task not found in this workspace"})
 		return
 	}
 
-	statusChanged := req.Status != nil && *req.Status != oldStatus
+	statusChanged := req.StatusID != nil
 	lastMovedUpdate := ""
 	if statusChanged {
 		lastMovedUpdate = ", last_moved_at = NOW()"
 	}
 
-	// Build UPDATE
 	var t Task
+	var aID, aEmail, aName, aAvatar *string
 	row := h.DB.QueryRow(context.Background(),
 		`WITH updated AS (
 		  UPDATE stract.tasks SET
 		    title       = COALESCE($1, title),
 		    description = COALESCE($2, description),
-		    status      = COALESCE($3, status),
+		    status_id   = COALESCE($3, status_id),
 		    priority    = COALESCE($4, priority),
 		    label       = COALESCE($5, label),
 		    due_date    = CASE WHEN $6::text IS NOT NULL THEN $6::date ELSE due_date END,
@@ -204,15 +208,26 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 		  WHERE id = $9
 		  RETURNING *
 		)
-		`+fullTaskSelect+` FROM updated t LEFT JOIN auth.users u ON u.id = t.assignee_id`,
-		req.Title, req.Description, req.Status, req.Priority, req.Label,
+		`+fullTaskSelect+` FROM updated t 
+		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
+		req.Title, req.Description, req.StatusID, req.Priority, req.Label,
 		req.DueDate, req.StartDate, req.AssigneeID,
 		id,
 	)
-	if err := taskScanFull(row, &t); err != nil {
+	if err := row.Scan(
+		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
+		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
+		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
+		&aID, &aEmail, &aName, &aAvatar,
+		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
+	); err != nil {
 		log.Printf("[ws-tasks] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task"})
 		return
+	}
+	if aID != nil && aEmail != nil {
+		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	action := "updated"
@@ -225,21 +240,23 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 		Action:     action,
 		TaskID:     id,
 		TaskTitle:  t.Title,
-		FromStatus: oldStatus,
-		ToStatus:   t.Status,
+		FromStatus: oldStatusName,
+		ToStatus:   t.Status.Name,
 	})
+
+	activity.LogActivity(h.DB, id, userID.(string), "updated the task", "", "")
+
 
 	c.JSON(http.StatusOK, gin.H{"data": t})
 }
 
 // WorkspaceCreateTask handles POST /api/v1/workspaces/:workspace_id/tasks
 func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
-	workspaceID := c.Param("workspace_id")
 	userID, _ := c.Get("user_id")
 
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title and status are required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title and status_id are required"})
 		return
 	}
 	if req.ProjectID == "" {
@@ -247,13 +264,13 @@ func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
 		return
 	}
 
-	var projectExists bool
+	var statusValid bool
 	err := h.DB.QueryRow(context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM stract.projects WHERE id = $1 AND workspace_id = $2 AND archived_at IS NULL)`,
-		req.ProjectID, workspaceID,
-	).Scan(&projectExists)
-	if err != nil || !projectExists {
-		c.JSON(http.StatusForbidden, gin.H{"error": "project not found in this workspace"})
+		`SELECT EXISTS(SELECT 1 FROM stract.project_statuses WHERE id = $1 AND project_id = $2)`,
+		req.StatusID, req.ProjectID,
+	).Scan(&statusValid)
+	if err != nil || !statusValid {
+		c.JSON(http.StatusForbidden, gin.H{"error": "invalid status_id for this project"})
 		return
 	}
 
@@ -269,20 +286,32 @@ func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
 	).Scan(&nextPosition)
 
 	var t Task
+	var aID, aEmail, aName, aAvatar *string
 	row := h.DB.QueryRow(context.Background(),
 		`WITH inserted AS (
-		  INSERT INTO stract.tasks (title, description, status, position, creator_id, project_id, priority, label, due_date, start_date, assignee_id)
+		  INSERT INTO stract.tasks (title, description, status_id, position, creator_id, project_id, priority, label, due_date, start_date, assignee_id)
 		  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		  RETURNING *
 		)
-		`+fullTaskSelect+` FROM inserted t LEFT JOIN auth.users u ON u.id = t.assignee_id`,
-		req.Title, req.Description, req.Status, nextPosition, userID, req.ProjectID, priority,
+		`+fullTaskSelect+` FROM inserted t 
+		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
+		req.Title, req.Description, req.StatusID, nextPosition, userID, req.ProjectID, priority,
 		req.Label, req.DueDate, req.StartDate, req.AssigneeID,
 	)
-	if err := taskScanFull(row, &t); err != nil {
+	if err := row.Scan(
+		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
+		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
+		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
+		&aID, &aEmail, &aName, &aAvatar,
+		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
+	); err != nil {
 		log.Printf("[ws-tasks] create error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create task"})
 		return
+	}
+	if aID != nil && aEmail != nil {
+		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	events.Emit(events.TaskEvent{
@@ -291,8 +320,11 @@ func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
 		Action:    "created",
 		TaskID:    t.ID,
 		TaskTitle: t.Title,
-		ToStatus:  t.Status,
+		ToStatus:  t.Status.Name,
 	})
+
+	activity.LogActivity(h.DB, t.ID, userID.(string), "created the task", "", "")
+
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
@@ -309,13 +341,14 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 		return
 	}
 
-	var oldStatus, taskTitle string
+	var oldStatusName, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
-		`SELECT t.status, t.title FROM stract.tasks t
+		`SELECT ps.name, t.title FROM stract.tasks t
 		 JOIN stract.projects p ON p.id = t.project_id
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.id = $1 AND p.workspace_id = $2 AND t.deleted_at IS NULL`,
 		id, workspaceID,
-	).Scan(&oldStatus, &taskTitle)
+	).Scan(&oldStatusName, &taskTitle)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "task not found in this workspace"})
 		return
@@ -338,14 +371,17 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 	newPos := (req.PrevPos + nextPos) / 2.0
 
 	cmdTag, err := h.DB.Exec(context.Background(),
-		`UPDATE stract.tasks SET position = $1, status = $2, last_moved_at = NOW(), updated_at = NOW()
+		`UPDATE stract.tasks SET position = $1, status_id = $2, last_moved_at = NOW(), updated_at = NOW()
 		 WHERE id = $3`,
-		newPos, req.Status, id,
+		newPos, req.StatusID, id,
 	)
 	if err != nil || cmdTag.RowsAffected() == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task position"})
 		return
 	}
+
+	var newStatusName string
+	_ = h.DB.QueryRow(context.Background(), "SELECT name FROM stract.project_statuses WHERE id = $1", req.StatusID).Scan(&newStatusName)
 
 	events.Emit(events.TaskEvent{
 		Timestamp:  time.Now(),
@@ -353,9 +389,12 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 		Action:     "moved",
 		TaskID:     id,
 		TaskTitle:  taskTitle,
-		FromStatus: oldStatus,
-		ToStatus:   req.Status,
+		FromStatus: oldStatusName,
+		ToStatus:   newStatusName,
 	})
+
+	activity.LogActivity(h.DB, id, userID.(string), "moved the task", oldStatusName, newStatusName)
+
 
 	c.JSON(http.StatusOK, gin.H{"message": "Task position updated successfully", "position": newPos})
 }
@@ -366,13 +405,14 @@ func (h *Handler) WorkspaceDeleteTask(c *gin.Context) {
 	workspaceID := c.Param("workspace_id")
 	userID, _ := c.Get("user_id")
 
-	var oldStatus, taskTitle string
+	var oldStatusName, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
-		`SELECT t.status, t.title FROM stract.tasks t
+		`SELECT ps.name, t.title FROM stract.tasks t
 		 JOIN stract.projects p ON p.id = t.project_id
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.id = $1 AND p.workspace_id = $2 AND t.deleted_at IS NULL`,
 		id, workspaceID,
-	).Scan(&oldStatus, &taskTitle)
+	).Scan(&oldStatusName, &taskTitle)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "task not found in this workspace"})
 		return
@@ -392,8 +432,11 @@ func (h *Handler) WorkspaceDeleteTask(c *gin.Context) {
 		Action:     "deleted",
 		TaskID:     id,
 		TaskTitle:  taskTitle,
-		FromStatus: oldStatus,
+		FromStatus: oldStatusName,
 	})
+
+	activity.LogActivity(h.DB, id, userID.(string), "deleted the task", "", "")
+
 
 	c.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 }

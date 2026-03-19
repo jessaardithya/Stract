@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { getTasks, deleteTask } from '@/lib/api';
+import { useStatuses } from '@/context/StatusContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { formatDate, dueDateStatus } from '@/utils/date';
 import {
@@ -19,14 +20,11 @@ const PRIORITY_CFG = {
   high: { label: 'High', dot: 'bg-red-500' },
 };
 
-const STATUS_CFG = {
-  'todo': { label: 'Todo', color: 'bg-gray-100 text-gray-700' },
-  'in-progress': { label: 'In Progress', color: 'bg-blue-100 text-blue-700' },
-  'done': { label: 'Done', color: 'bg-green-100 text-green-700' },
-};
+
 
 export default function ListView() {
   const { activeWorkspace, activeProject, openTask } = useApp();
+  const { statuses } = useStatuses();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -94,7 +92,11 @@ export default function ListView() {
     return [...tasks].sort((a, b) => {
       let cmp = 0;
       if (sortCol === 'title') cmp = a.title.localeCompare(b.title);
-      else if (sortCol === 'status') cmp = a.status.localeCompare(b.status);
+      else if (sortCol === 'status') {
+        const aName = a.status?.name || '';
+        const bName = b.status?.name || '';
+        cmp = aName.localeCompare(bName);
+      }
       else if (sortCol === 'priority') {
         const pMap = { low: 1, medium: 2, high: 3 };
         cmp = (pMap[a.priority] || 0) - (pMap[b.priority] || 0);
@@ -116,13 +118,22 @@ export default function ListView() {
 
   const groupedTasks = useMemo(() => {
     if (!isGrouped) return { all: sortedTasks };
-    const groups = { 'todo': [], 'in-progress': [], 'done': [] };
+    // Initialize groups based on project statuses
+    const groups = {};
+    statuses.forEach(s => { groups[s.id] = []; });
+    
+    // Sort tasks into groups
     sortedTasks.forEach(t => {
-      if (groups[t.status]) groups[t.status].push(t);
-      else groups['todo'].push(t); // fallback
+      const sId = t.status_id || t.status?.id;
+      if (groups[sId]) groups[sId].push(t);
+      else {
+        // Handle case where status_id might not match (fallback to first group or skip)
+        const firstId = statuses[0]?.id;
+        if (firstId && groups[firstId]) groups[firstId].push(t);
+      }
     });
     return groups;
-  }, [sortedTasks, isGrouped]);
+  }, [sortedTasks, isGrouped, statuses]);
 
 
   if (loading && tasks.length === 0) {
@@ -145,8 +156,16 @@ export default function ListView() {
       </div>
       
       <div className="w-[120px] px-2">
-        <Badge variant="secondary" className={`font-medium ${STATUS_CFG[t.status]?.color || 'bg-gray-100 text-gray-700'}`}>
-          {STATUS_CFG[t.status]?.label || t.status}
+        <Badge 
+          variant="secondary" 
+          className="font-medium bg-gray-50 border-gray-100"
+          style={t.status?.color ? { 
+            backgroundColor: `${t.status.color}15`, 
+            color: t.status.color, 
+            borderColor: `${t.status.color}30` 
+          } : {}}
+        >
+          {t.status?.name || 'Unknown'}
         </Badge>
       </div>
       
@@ -261,19 +280,19 @@ export default function ListView() {
           {/* Rows */}
           <div className="flex flex-col">
             {isGrouped ? (
-              ['todo', 'in-progress', 'done'].map(status => {
-                const groupTasks = groupedTasks[status];
+              statuses.map(status => {
+                const groupTasks = groupedTasks[status.id] || [];
                 if (!groupTasks.length) return null;
-                const isCollapsed = collapsedGroups[status];
+                const isCollapsed = collapsedGroups[status.id];
                 return (
-                  <div key={status}>
+                  <div key={status.id}>
                     {/* Subhead */}
                     <div 
                       className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-[#f0f0ee] cursor-pointer hover:bg-gray-100"
-                      onClick={() => toggleGroup(status)}
+                      onClick={() => toggleGroup(status.id)}
                     >
                       {isCollapsed ? <ChevronRight size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
-                      <span className="text-xs font-semibold text-gray-700 tracking-wide uppercase">{STATUS_CFG[status]?.label}</span>
+                      <span className="text-xs font-semibold text-gray-700 tracking-wide uppercase">{status.name}</span>
                       <span className="text-xs text-gray-400">{groupTasks.length}</span>
                     </div>
                     {/* Group tasks */}

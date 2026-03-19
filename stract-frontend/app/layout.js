@@ -11,16 +11,20 @@ export const metadata = {
   description: "A premium task management Kanban board",
 };
 
+import { StatusProvider } from '@/context/StatusContext';
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body className="font-sans antialiased bg-[#fafaf8] text-[#1a1a1a]">
         <TooltipProvider delayDuration={300}>
           <AppContextProvider>
-            <BootGate>
-              {children}
-              <TaskDetailModal />
-            </BootGate>
+            <StatusProvider>
+              <BootGate>
+                {children}
+                <TaskDetailModal />
+              </BootGate>
+            </StatusProvider>
             <Toaster
               position="bottom-right"
               duration={3500}

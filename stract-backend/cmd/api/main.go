@@ -23,6 +23,9 @@ import (
 	"stract-backend/internal/features/tasks"
 	"stract-backend/internal/features/workspaces"
 	"stract-backend/internal/features/members"
+	"stract-backend/internal/features/statuses"
+	"stract-backend/internal/features/subtasks"
+	"stract-backend/internal/features/activity"
 )
 
 func main() {
@@ -85,6 +88,10 @@ func main() {
 	projectGroup := wsGroup.Group("/projects")
 	projects.RegisterRoutes(projectGroup, db)
 
+	// Statuses under project
+	statusGroup := projectGroup.Group("/:id/statuses")
+	statuses.RegisterRoutes(statusGroup, db)
+
 	// Tasks under workspace (workspace-scoped, project_id required)
 	tasks.RegisterWorkspaceRoutes(wsGroup, db)
 
@@ -93,6 +100,14 @@ func main() {
 
 	// Members & Labels under workspace
 	members.RegisterRoutes(wsGroup, db)
+
+	// Feature: Task Details (Subtasks/Activity)
+	// These move to /api/v1/workspaces/:workspace_id/tasks/:id/...
+	taskDetailGroup := wsGroup.Group("/tasks/:id")
+	{
+		subtasks.RegisterRoutes(taskDetailGroup.Group("/subtasks"), db)
+		activity.RegisterRoutes(taskDetailGroup.Group("/activity"), db)
+	}
 
 	// ── SSE stream (query-param JWT auth, no standard middleware) ─────────────
 	apiV1SSE := r.Group("/api/v1")

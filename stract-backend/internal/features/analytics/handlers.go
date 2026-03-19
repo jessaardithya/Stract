@@ -176,7 +176,9 @@ func (h *Handler) compute(ctx context.Context, userID string) (*Summary, error) 
 func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*WorkspaceSummary, error) {
 	// Status counts
 	rows, err := h.DB.Query(ctx,
-		`SELECT status, COUNT(*) FROM stract.tasks WHERE project_id = $1 AND deleted_at IS NULL GROUP BY status`,
+		`SELECT ps.name, COUNT(*) FROM stract.tasks t
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
+		 WHERE t.project_id = $1 AND t.deleted_at IS NULL GROUP BY ps.name`,
 		projectID,
 	)
 	if err != nil {
@@ -184,13 +186,13 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 	}
 	defer rows.Close()
 
-	byStatus := map[string]int{"todo": 0, "in-progress": 0, "done": 0}
+	byStatus := make(map[string]int)
 	totalActive := 0
 	for rows.Next() {
-		var status string
+		var statusName string
 		var count int
-		rows.Scan(&status, &count)
-		byStatus[status] = count
+		rows.Scan(&statusName, &count)
+		byStatus[statusName] = count
 		totalActive += count
 	}
 
@@ -213,24 +215,26 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 
 	var velocity7d, staleCount int
 	h.DB.QueryRow(ctx,
-		`SELECT COUNT(*) FROM stract.tasks WHERE project_id = $1 AND status = 'done'
-		 AND deleted_at IS NULL AND last_moved_at >= NOW() - INTERVAL '7 days'`, projectID,
+		`SELECT COUNT(*) FROM stract.tasks t
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
+		 WHERE t.project_id = $1 AND ps.name = 'Done'
+		 AND t.deleted_at IS NULL AND t.last_moved_at >= NOW() - INTERVAL '7 days'`, projectID,
 	).Scan(&velocity7d)
 	h.DB.QueryRow(ctx,
-		`SELECT COUNT(*) FROM stract.tasks WHERE project_id = $1 AND status != 'done'
-		 AND deleted_at IS NULL AND last_moved_at < NOW() - INTERVAL '3 days'`, projectID,
+		`SELECT COUNT(*) FROM stract.tasks t
+		 JOIN stract.project_statuses ps ON ps.id = t.status_id
+		 WHERE t.project_id = $1 AND ps.name != 'Done'
+		 AND t.deleted_at IS NULL AND t.last_moved_at < NOW() - INTERVAL '3 days'`, projectID,
 	).Scan(&staleCount)
 
 	// Completion rate = done / total * 100
 	completionRate := 0.0
-	if totalActive+byStatus["done"] > 0 {
-		allTasks := totalActive // totalActive already includes done
-		if allTasks > 0 {
-			completionRate = float64(byStatus["done"]) / float64(allTasks) * 100.0
-		}
+	doneCount := byStatus["Done"]
+	if totalActive > 0 {
+		completionRate = float64(doneCount) / float64(totalActive) * 100.0
 	}
 
-	health := deriveHealth(byStatus["todo"], byStatus["in-progress"])
+	health := deriveHealth(byStatus["Todo"], byStatus["In Progress"])
 	return &WorkspaceSummary{
 		ProjectID:      projectID,
 		TotalActive:    totalActive,

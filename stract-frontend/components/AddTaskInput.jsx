@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { createTask } from '@/lib/api';
 
-export default function AddTaskInput({ status, onTaskAdded, onError, activeWorkspace, activeProject }) {
+export default function AddTaskInput({ statusId, onTaskAdded, onError, activeWorkspace, activeProject }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -25,7 +25,7 @@ export default function AddTaskInput({ status, onTaskAdded, onError, activeWorks
     if (!trimmed || !activeWorkspace?.id || !activeProject?.id) return;
     setIsSubmitting(true);
     try {
-      const result = await createTask(activeWorkspace.id, activeProject.id, trimmed, status, priority, description.trim());
+      const result = await createTask(activeWorkspace.id, activeProject.id, trimmed, statusId, priority, description.trim());
       onTaskAdded(result.data);
       setTitle('');
       setDescription('');
