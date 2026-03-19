@@ -12,6 +12,7 @@ export default function CreateWorkspace() {
   const { addWorkspace } = useApp();
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +40,7 @@ export default function CreateWorkspace() {
     setIsSubmitting(true);
     setSlugError('');
     try {
-      const result = await createWorkspace({ name: trimmedName, slug: trimmedSlug });
+      const result = await createWorkspace({ name: trimmedName, slug: trimmedSlug, description: description.trim() });
       await addWorkspace(result.data);
     } catch (err) {
       if (err.message?.toLowerCase().includes('slug') || err.message?.toLowerCase().includes('taken') || err.message?.includes('409')) {
@@ -81,6 +82,20 @@ export default function CreateWorkspace() {
               onChange={handleNameChange}
               onKeyDown={handleKeyDown}
               placeholder="e.g. Acme Corp"
+              disabled={isSubmitting}
+              className="border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
+            />
+          </div>
+
+          {/* Workspace Description */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">
+              Description <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this workspace for?"
               disabled={isSubmitting}
               className="border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
             />

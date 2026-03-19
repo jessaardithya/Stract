@@ -181,6 +181,20 @@ func (h *Handler) ArchiveProject(c *gin.Context) {
 	id := c.Param("id")
 	userID, _ := c.Get("user_id")
 
+	var activeTasks int
+	countErr := h.DB.QueryRow(context.Background(),
+		"SELECT COUNT(*) FROM stract.tasks WHERE project_id = $1 AND deleted_at IS NULL",
+		id,
+	).Scan(&activeTasks)
+	if countErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify project contents"})
+		return
+	}
+	if activeTasks > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete project that contains tasks. Please delete or move the tasks first."})
+		return
+	}
+
 	var p Project
 	err := h.DB.QueryRow(context.Background(),
 		`UPDATE stract.projects

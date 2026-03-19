@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +29,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
   LayoutDashboard,
   Settings,
@@ -41,8 +41,9 @@ import {
   Loader2,
   Globe,
   LogOut,
-} from 'lucide-react';
-import { useApp } from '@/context/AppContext';
+  LayoutList,
+} from "lucide-react";
+import { useApp } from "@/context/AppContext";
 import {
   createProject,
   createWorkspace,
@@ -50,38 +51,53 @@ import {
   deleteProject,
   updateWorkspace,
   deleteWorkspace,
-} from '@/lib/api';
-import { deriveSlug } from '@/utils/slug';
+} from "@/lib/api";
+import { deriveSlug } from "@/utils/slug";
 
 const PRESET_COLORS = [
-  '#6366f1', '#3b82f6', '#10b981', '#f59e0b',
-  '#ef4444', '#8b5cf6', '#ec4899', '#6b7280',
+  "#6366f1",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#6b7280",
 ];
 
 const BOTTOM_NAV = [
-  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { href: '/settings', label: 'Settings', Icon: Settings },
+  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/settings", label: "Settings", Icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter(); // [NEW] routing fix
   const {
-    activeWorkspace, activeProject, workspaces, projects,
-    setActiveWorkspace, setActiveProject, addWorkspace, refreshProjects,
+    activeWorkspace,
+    activeProject,
+    workspaces,
+    projects,
+    setActiveWorkspace,
+    setActiveProject,
+    addWorkspace,
+    refreshProjects,
   } = useApp();
 
   // Project form (Creation)
   const [showNewProject, setShowNewProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
   const [newProjectColor, setNewProjectColor] = useState(PRESET_COLORS[0]);
   const [isCreating, setIsCreating] = useState(false);
 
   // Project Settings (Edit/Delete)
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
-  const [editProjectName, setEditProjectName] = useState('');
-  const [editProjectColor, setEditProjectColor] = useState('');
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectDescription, setEditProjectDescription] = useState("");
+  const [editProjectColor, setEditProjectColor] = useState("");
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+  const [projectDeleteError, setProjectDeleteError] = useState("");
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
 
@@ -89,6 +105,7 @@ export default function Sidebar() {
     e.stopPropagation();
     if (activeProject) {
       setEditProjectName(activeProject.name);
+      setEditProjectDescription(activeProject.description || "");
       setEditProjectColor(activeProject.color);
       setProjectSettingsOpen(true);
     }
@@ -99,11 +116,15 @@ export default function Sidebar() {
     if (!trimmed || !activeWorkspace || !activeProject) return;
     setIsUpdatingProject(true);
     try {
-      await updateProject(activeWorkspace.id, activeProject.id, { name: trimmed, color: editProjectColor });
+      await updateProject(activeWorkspace.id, activeProject.id, {
+        name: trimmed,
+        description: editProjectDescription.trim(),
+        color: editProjectColor,
+      });
       await refreshProjects();
       setProjectSettingsOpen(false);
     } catch (err) {
-      console.error('[Sidebar] update project error:', err);
+      console.error("[Sidebar] update project error:", err);
     } finally {
       setIsUpdatingProject(false);
     }
@@ -112,13 +133,15 @@ export default function Sidebar() {
   const handleDeleteProject = async () => {
     if (!activeWorkspace || !projectToDelete) return;
     setIsDeletingProject(true);
+    setProjectDeleteError("");
     try {
       await deleteProject(activeWorkspace.id, projectToDelete.id);
       await refreshProjects();
       setProjectToDelete(null);
       setProjectSettingsOpen(false);
     } catch (err) {
-      console.error('[Sidebar] delete project error:', err);
+      console.error("[Sidebar] delete project error:", err);
+      setProjectDeleteError(err.message || "Failed to delete project.");
     } finally {
       setIsDeletingProject(false);
     }
@@ -138,26 +161,29 @@ export default function Sidebar() {
 
   // New workspace dialog ... (exists)
   const [wsDialogOpen, setWsDialogOpen] = useState(false);
-  const [wsName, setWsName] = useState('');
-  const [wsSlug, setWsSlug] = useState('');
+  const [wsName, setWsName] = useState("");
+  const [wsDescription, setWsDescription] = useState("");
+  const [wsSlug, setWsSlug] = useState("");
   const [wsSlugManuallyEdited, setWsSlugManuallyEdited] = useState(false);
-  const [wsSlugError, setWsSlugError] = useState('');
+  const [wsSlugError, setWsSlugError] = useState("");
   const [wsCreating, setWsCreating] = useState(false);
 
   // ... (workspace handlers omitted for brevity, will replace carefully below)
 
-
   // Workspace Settings (Edit/Delete)
   const [wsSettingsOpen, setWsSettingsOpen] = useState(false);
-  const [editWsName, setEditWsName] = useState('');
+  const [editWsName, setEditWsName] = useState("");
+  const [editWsDescription, setEditWsDescription] = useState("");
   const [isUpdatingWs, setIsUpdatingWs] = useState(false);
   const [wsDeleteAlertOpen, setWsDeleteAlertOpen] = useState(false);
+  const [wsDeleteError, setWsDeleteError] = useState("");
   const [isDeletingWs, setIsDeletingWs] = useState(false);
 
   const openWsSettings = (e) => {
     e.stopPropagation();
     if (activeWorkspace) {
       setEditWsName(activeWorkspace.name);
+      setEditWsDescription(activeWorkspace.description || "");
       setWsSettingsOpen(true);
       setWsOpen(false);
     }
@@ -168,16 +194,19 @@ export default function Sidebar() {
     if (!trimmed || !activeWorkspace) return;
     setIsUpdatingWs(true);
     try {
-      const result = await updateWorkspace(activeWorkspace.id, { name: trimmed });
+      const result = await updateWorkspace(activeWorkspace.id, {
+        name: trimmed,
+        description: editWsDescription.trim(),
+      });
       // Update the workspace in the local context list by re-fetching or mutating
       // Easiest is to force a re-boot or just update the current one in place
-      // For now, since AppContext handles boot, we can just reload the page or 
-      // rely on the user to see it reflected on next boot. 
+      // For now, since AppContext handles boot, we can just reload the page or
+      // rely on the user to see it reflected on next boot.
       // Better: we update the activeWorkspace directly, but AppContext `workspaces` needs updating.
       // Let's reload to keep context perfectly synced for this basic version:
       window.location.reload();
     } catch (err) {
-      console.error('[Sidebar] update workspace error:', err);
+      console.error("[Sidebar] update workspace error:", err);
     } finally {
       setIsUpdatingWs(false);
     }
@@ -186,13 +215,17 @@ export default function Sidebar() {
   const handleDeleteWorkspace = async () => {
     if (!activeWorkspace) return;
     setIsDeletingWs(true);
+    setWsDeleteError("");
     try {
       await deleteWorkspace(activeWorkspace.id);
-      localStorage.removeItem('activeWorkspaceId');
-      localStorage.removeItem('activeProjectId');
+      localStorage.removeItem("activeWorkspaceId");
+      localStorage.removeItem("activeProjectId");
       window.location.reload(); // AppContext boot sequence will gracefully handle the empty state
     } catch (err) {
-      console.error('[Sidebar] delete workspace error:', err);
+      console.error("[Sidebar] delete workspace error:", err);
+      setWsDeleteError(
+        err.message || "Failed to delete workspace. Please try again.",
+      );
     } finally {
       setIsDeletingWs(false);
     }
@@ -202,36 +235,44 @@ export default function Sidebar() {
     setWsName(e.target.value);
     if (!wsSlugManuallyEdited) {
       setWsSlug(deriveSlug(e.target.value));
-      setWsSlugError('');
+      setWsSlugError("");
     }
   };
   const handleWsSlugChange = (e) => {
     setWsSlugManuallyEdited(true);
     setWsSlug(deriveSlug(e.target.value));
-    setWsSlugError('');
+    setWsSlugError("");
   };
   const handleWsDialogClose = () => {
     setWsDialogOpen(false);
-    setWsName('');
-    setWsSlug('');
+    setWsName("");
+    setWsDescription("");
+    setWsSlug("");
     setWsSlugManuallyEdited(false);
-    setWsSlugError('');
+    setWsSlugError("");
   };
   const handleCreateWorkspace = async () => {
     const trimmedName = wsName.trim();
     const trimmedSlug = wsSlug.trim();
     if (!trimmedName || !trimmedSlug || wsCreating) return;
     setWsCreating(true);
-    setWsSlugError('');
+    setWsSlugError("");
     try {
-      const result = await createWorkspace({ name: trimmedName, slug: trimmedSlug });
+      const result = await createWorkspace({
+        name: trimmedName,
+        slug: trimmedSlug,
+        description: wsDescription.trim(),
+      });
       handleWsDialogClose();
       await addWorkspace(result.data);
     } catch (err) {
-      if (err.message?.toLowerCase().includes('slug') || err.message?.toLowerCase().includes('taken')) {
-        setWsSlugError('This URL is already taken');
+      if (
+        err.message?.toLowerCase().includes("slug") ||
+        err.message?.toLowerCase().includes("taken")
+      ) {
+        setWsSlugError("This URL is already taken");
       } else {
-        setWsSlugError(err.message || 'Something went wrong');
+        setWsSlugError(err.message || "Something went wrong");
       }
     } finally {
       setWsCreating(false);
@@ -244,30 +285,38 @@ export default function Sidebar() {
     if (!name || !activeWorkspace) return;
     setIsCreating(true);
     try {
-      const result = await createProject(activeWorkspace.id, { name, color: newProjectColor });
+      const result = await createProject(activeWorkspace.id, {
+        name,
+        description: newProjectDescription.trim(),
+        color: newProjectColor,
+      });
       await refreshProjects();
       setActiveProject(result.data);
       setShowNewProject(false);
-      setNewProjectName('');
+      setNewProjectName("");
+      setNewProjectDescription("");
       setNewProjectColor(PRESET_COLORS[0]);
-      router.push('/');
+      router.push("/");
     } catch (err) {
-      console.error('[Sidebar] create project error:', err);
+      console.error("[Sidebar] create project error:", err);
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleNewProjectKeyDown = (e) => {
-    if (e.key === 'Enter') handleCreateProject();
-    if (e.key === 'Escape' && projects.length > 0) {
+    if (e.key === "Enter") handleCreateProject();
+    if (e.key === "Escape" && projects.length > 0) {
       setShowNewProject(false);
-      setNewProjectName('');
+      setNewProjectName("");
+      setNewProjectDescription("");
     }
   };
 
   const totalTaskCount = (p) =>
-    (p.task_counts?.todo ?? 0) + (p.task_counts?.in_progress ?? 0) + (p.task_counts?.done ?? 0);
+    (p.task_counts?.todo ?? 0) +
+    (p.task_counts?.in_progress ?? 0) +
+    (p.task_counts?.done ?? 0);
 
   return (
     <>
@@ -278,11 +327,11 @@ export default function Sidebar() {
             <PopoverTrigger className="flex-1 flex items-center gap-2.5 pl-4 pr-1 h-full hover:bg-[#f4f4f2] transition-colors text-left outline-none cursor-pointer">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
                 <span className="text-white text-xs font-bold">
-                  {activeWorkspace?.name?.[0]?.toUpperCase() ?? 'S'}
+                  {activeWorkspace?.name?.[0]?.toUpperCase() ?? "S"}
                 </span>
               </div>
               <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
-                {activeWorkspace?.name ?? 'Loading…'}
+                {activeWorkspace?.name ?? "Loading…"}
               </span>
               <ChevronsUpDown size={13} className="text-[#8a8a85] shrink-0" />
             </PopoverTrigger>
@@ -293,27 +342,41 @@ export default function Sidebar() {
             >
               <Settings size={14} />
             </button>
-            <PopoverContent className="w-[200px] p-1.5" align="start" side="bottom">
-              <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-2 py-1">Workspaces</p>
+            <PopoverContent
+              className="w-[200px] p-1.5"
+              align="start"
+              side="bottom"
+            >
+              <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-2 py-1">
+                Workspaces
+              </p>
               {workspaces.map((ws) => (
                 <button
                   key={ws.id}
-                  onClick={() => { setActiveWorkspace(ws); setWsOpen(false); }}
+                  onClick={() => {
+                    setActiveWorkspace(ws);
+                    setWsOpen(false);
+                  }}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
                     ws.id === activeWorkspace?.id
-                      ? 'bg-violet-50 text-violet-700 font-medium'
-                      : 'text-gray-700 hover:bg-[#f4f4f2]'
+                      ? "bg-violet-50 text-violet-700 font-medium"
+                      : "text-gray-700 hover:bg-[#f4f4f2]"
                   }`}
                 >
                   <Building2 size={13} />
                   <span className="truncate">{ws.name}</span>
-                  {ws.id === activeWorkspace?.id && <Check size={12} className="ml-auto shrink-0" />}
+                  {ws.id === activeWorkspace?.id && (
+                    <Check size={12} className="ml-auto shrink-0" />
+                  )}
                 </button>
               ))}
               {/* New workspace */}
               <div className="border-t border-[#e4e4e0] mt-1 pt-1">
                 <button
-                  onClick={() => { setWsOpen(false); setWsDialogOpen(true); }}
+                  onClick={() => {
+                    setWsOpen(false);
+                    setWsDialogOpen(true);
+                  }}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[#8a8a85] hover:bg-[#f4f4f2] hover:text-gray-700 transition-colors"
                 >
                   <Plus size={13} />
@@ -322,9 +385,9 @@ export default function Sidebar() {
                 <button
                   onClick={async () => {
                     await supabase.auth.signOut();
-                    localStorage.removeItem('activeWorkspaceId');
-                    localStorage.removeItem('activeProjectId');
-                    router.push('/login');
+                    localStorage.removeItem("activeWorkspaceId");
+                    localStorage.removeItem("activeProjectId");
+                    router.push("/login");
                   }}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"
                 >
@@ -338,7 +401,9 @@ export default function Sidebar() {
 
         {/* Project List */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-3 mb-1.5">Projects</p>
+          <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-3 mb-1.5">
+            Projects
+          </p>
 
           {projects.map((p) => {
             const isActive = activeProject?.id === p.id;
@@ -348,33 +413,63 @@ export default function Sidebar() {
                 <button
                   onClick={() => {
                     setActiveProject(p);
-                    router.push('/');
+                    router.push("/");
                   }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100 text-left ${
                     isActive
-                      ? 'text-gray-900 bg-[#f4f4f2]'
-                      : 'text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900'
+                      ? "text-gray-900 bg-[#f4f4f2]"
+                      : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
                   }`}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: p.color }}
+                  />
                   <span className="flex-1 truncate">{p.name}</span>
                   {!isActive && count > 0 && (
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] h-4 px-1.5 font-medium"
+                    >
                       {count}
                     </Badge>
                   )}
                 </button>
                 {/* Accordion Expanded State */}
                 {isActive && (
-                  <div className="pl-6 pr-2 py-1 flex flex-col gap-0.5 border-l-2 ml-4 mt-0.5 mb-2" style={{ borderColor: `${p.color}40` }}>
+                  <div
+                    className="pl-6 pr-2 py-1 flex flex-col gap-0.5 border-l-2 ml-4 mt-0.5 mb-2"
+                    style={{ borderColor: `${p.color}40` }}
+                  >
                     <button
-                      onClick={() => router.push('/')}
+                      onClick={() => router.push("/")}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
-                        pathname === '/' ? 'bg-white shadow-sm border border-[#e4e4e0] font-medium text-gray-900' : 'text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2]'
+                        pathname === "/"
+                          ? "bg-white shadow-sm border border-[#e4e4e0] font-medium text-gray-900"
+                          : "text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2]"
                       }`}
                     >
-                      <LayoutDashboard size={13} className={pathname === '/' ? `text-[${p.color}]` : ''} style={pathname === '/' ? { color: p.color } : {}} />
+                      <LayoutDashboard
+                        size={13}
+                        className={pathname === "/" ? `text-[${p.color}]` : ""}
+                        style={pathname === "/" ? { color: p.color } : {}}
+                      />
                       Kanban Board
+                    </button>
+                    <button
+                      onClick={() => router.push("/list")}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                        pathname === "/list"
+                          ? "bg-white shadow-sm border border-[#e4e4e0] font-medium text-gray-900"
+                          : "text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2]"
+                      }`}
+                    >
+                      <LayoutList
+                        size={13}
+                        className={pathname === "/list" ? `text-[${p.color}]` : ""}
+                        style={pathname === "/list" ? { color: p.color } : {}}
+                      />
+                      List View
                     </button>
                     <button
                       onClick={openProjectSettings}
@@ -399,6 +494,14 @@ export default function Sidebar() {
                 onKeyDown={handleNewProjectKeyDown}
                 placeholder="Project name…"
                 disabled={isCreating}
+                className="h-7 text-xs mb-1.5 border-[#e4e4e0] focus-visible:ring-violet-300"
+              />
+              <Input
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                onKeyDown={handleNewProjectKeyDown}
+                placeholder="Project description (optional)"
+                disabled={isCreating}
                 className="h-7 text-xs mb-2 border-[#e4e4e0] focus-visible:ring-violet-300"
               />
               {/* Color swatches */}
@@ -411,7 +514,10 @@ export default function Sidebar() {
                     style={{ backgroundColor: color }}
                   >
                     {newProjectColor === color && (
-                      <Check size={10} className="absolute inset-0 m-auto text-white" />
+                      <Check
+                        size={10}
+                        className="absolute inset-0 m-auto text-white"
+                      />
                     )}
                   </button>
                 ))}
@@ -423,14 +529,21 @@ export default function Sidebar() {
                   disabled={isCreating || !newProjectName.trim()}
                   className="h-6 text-[11px] px-2 bg-[#1a1a1a] hover:bg-[#333] text-white"
                 >
-                  {isCreating ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} className="mr-1" />}
-                  {isCreating ? 'Creating…' : 'Create'}
+                  {isCreating ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : (
+                    <Check size={10} className="mr-1" />
+                  )}
+                  {isCreating ? "Creating…" : "Create"}
                 </Button>
                 {projects.length > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => { setShowNewProject(false); setNewProjectName(''); }}
+                    onClick={() => {
+                      setShowNewProject(false);
+                      setNewProjectName("");
+                    }}
                     className="h-6 text-[11px] px-2 text-[#8a8a85]"
                   >
                     <X size={10} />
@@ -438,7 +551,9 @@ export default function Sidebar() {
                 )}
               </div>
               {projects.length === 0 && (
-                <p className="text-xs text-gray-400 mt-3">You can always add more projects later.</p>
+                <p className="text-xs text-gray-400 mt-3">
+                  You can always add more projects later.
+                </p>
               )}
             </div>
           ) : (
@@ -461,11 +576,14 @@ export default function Sidebar() {
                   href={href}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-0.5 text-sm font-medium transition-colors ${
                     active
-                      ? 'bg-violet-50 text-violet-700'
-                      : 'text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900'
+                      ? "bg-violet-50 text-violet-700"
+                      : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
                   }`}
                 >
-                  <Icon size={15} className={active ? 'text-violet-600' : 'text-[#8a8a85]'} />
+                  <Icon
+                    size={15}
+                    className={active ? "text-violet-600" : "text-[#8a8a85]"}
+                  />
                   {label}
                 </Link>
               );
@@ -476,17 +594,26 @@ export default function Sidebar() {
         {/* User */}
         <div className="px-4 py-4 border-t border-[#e4e4e0] flex items-center gap-3">
           <Avatar className="h-7 w-7 shrink-0">
-            <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">J</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
+              J
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate leading-tight">Jessa</p>
+            <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+              Jessa
+            </p>
             <p className="text-[11px] text-[#8a8a85] truncate">Free plan</p>
           </div>
         </div>
       </aside>
 
       {/* New Workspace Dialog */}
-      <Dialog open={wsDialogOpen} onOpenChange={(open) => { if (!open) handleWsDialogClose(); }}>
+      <Dialog
+        open={wsDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleWsDialogClose();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create a new workspace</DialogTitle>
@@ -495,13 +622,31 @@ export default function Sidebar() {
           <div className="space-y-4 py-2">
             {/* Workspace name */}
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Workspace name</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Workspace name
+              </label>
               <Input
                 autoFocus
                 value={wsName}
                 onChange={handleWsNameChange}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateWorkspace()}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
                 placeholder="e.g. My Team"
+                disabled={wsCreating}
+                className="border-[#e4e4e0] focus-visible:ring-violet-300"
+              />
+            </div>
+
+            {/* Workspace Description */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Description{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <Input
+                value={wsDescription}
+                onChange={(e) => setWsDescription(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
+                placeholder="What is this workspace for?"
                 disabled={wsCreating}
                 className="border-[#e4e4e0] focus-visible:ring-violet-300"
               />
@@ -509,11 +654,15 @@ export default function Sidebar() {
 
             {/* Slug */}
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Workspace URL</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Workspace URL
+              </label>
               <div className="flex items-center rounded-lg border border-[#e4e4e0] overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 transition-all">
                 <div className="flex items-center gap-1.5 pl-3 pr-2 py-2 bg-[#f4f4f2] border-r border-[#e4e4e0] shrink-0">
                   <Globe size={13} className="text-[#8a8a85]" />
-                  <span className="text-sm text-gray-400 whitespace-nowrap">stract.app /</span>
+                  <span className="text-sm text-gray-400 whitespace-nowrap">
+                    stract.app /
+                  </span>
                 </div>
                 <input
                   value={wsSlug}
@@ -530,7 +679,11 @@ export default function Sidebar() {
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={handleWsDialogClose} disabled={wsCreating}>
+            <Button
+              variant="ghost"
+              onClick={handleWsDialogClose}
+              disabled={wsCreating}
+            >
               Cancel
             </Button>
             <Button
@@ -543,7 +696,9 @@ export default function Sidebar() {
                   <Loader2 size={14} className="mr-2 animate-spin" />
                   Creating…
                 </>
-              ) : 'Create'}
+              ) : (
+                "Create"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -556,17 +711,35 @@ export default function Sidebar() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Project Name</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Project Name
+              </label>
               <Input
                 value={editProjectName}
                 onChange={(e) => setEditProjectName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUpdateProject()}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateProject()}
                 disabled={isUpdatingProject}
                 className="border-[#e4e4e0] focus-visible:ring-violet-300"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Color</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Description{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <Input
+                value={editProjectDescription}
+                onChange={(e) => setEditProjectDescription(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateProject()}
+                placeholder="What is this project?"
+                disabled={isUpdatingProject}
+                className="border-[#e4e4e0] focus-visible:ring-violet-300"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Color
+              </label>
               <div className="flex items-center gap-2 flex-wrap bg-[#f4f4f2] p-2 rounded-lg border border-[#e4e4e0]">
                 {PRESET_COLORS.map((color) => (
                   <button
@@ -575,13 +748,20 @@ export default function Sidebar() {
                     className="w-6 h-6 rounded-full transition-transform hover:scale-110 relative border border-black/10 shadow-sm"
                     style={{ backgroundColor: color }}
                   >
-                    {editProjectColor === color && <Check size={12} className="absolute inset-0 m-auto text-white drop-shadow-sm" />}
+                    {editProjectColor === color && (
+                      <Check
+                        size={12}
+                        className="absolute inset-0 m-auto text-white drop-shadow-sm"
+                      />
+                    )}
                   </button>
                 ))}
               </div>
             </div>
             <div className="pt-4 border-t border-[#e4e4e0] mt-4">
-              <label className="text-sm font-medium text-red-600 block mb-1.5">Danger Zone</label>
+              <label className="text-sm font-medium text-red-600 block mb-1.5">
+                Danger Zone
+              </label>
               <button
                 onClick={() => setProjectToDelete(activeProject)}
                 className="w-full flex items-center justify-center gap-2 px-3 h-9 rounded-md text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
@@ -591,31 +771,71 @@ export default function Sidebar() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setProjectSettingsOpen(false)} disabled={isUpdatingProject}>Cancel</Button>
-            <Button onClick={handleUpdateProject} disabled={!editProjectName.trim() || isUpdatingProject} className="bg-[#1a1a1a] hover:bg-[#333] text-white">
-              {isUpdatingProject ? <Loader2 size={14} className="mr-2 animate-spin" /> : 'Save Changes'}
+            <Button
+              variant="ghost"
+              onClick={() => setProjectSettingsOpen(false)}
+              disabled={isUpdatingProject}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateProject}
+              disabled={!editProjectName.trim() || isUpdatingProject}
+              className="bg-[#1a1a1a] hover:bg-[#333] text-white"
+            >
+              {isUpdatingProject ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Project Confirm */}
-      <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+      <AlertDialog
+        open={!!projectToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProjectToDelete(null);
+            setProjectDeleteError("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the <strong>{projectToDelete?.name}</strong> project and all of its tasks. This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div>
+                This will permanently delete the{" "}
+                <strong>{projectToDelete?.name}</strong> project and all of its
+                tasks. This action cannot be undone.
+                {projectDeleteError && (
+                  <div className="mt-3 p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm font-medium">
+                    {projectDeleteError}
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingProject}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingProject}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteProject(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteProject();
+              }}
               disabled={isDeletingProject}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              {isDeletingProject ? <Loader2 size={14} className="mr-2 animate-spin" /> : 'Delete Project'}
+              {isDeletingProject ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : (
+                "Delete Project"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -628,20 +848,43 @@ export default function Sidebar() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Workspace Name</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Workspace Name
+              </label>
               <Input
                 value={editWsName}
                 onChange={(e) => setEditWsName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUpdateWorkspace()}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateWorkspace()}
                 disabled={isUpdatingWs}
                 className="border-[#e4e4e0] focus-visible:ring-violet-300"
               />
-              <p className="text-xs text-gray-500 mt-1.5">Note: Workspace URL cannot be changed after creation.</p>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Note: Workspace URL cannot be changed after creation.
+              </p>
             </div>
-            
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                Description{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <Input
+                value={editWsDescription}
+                onChange={(e) => setEditWsDescription(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateWorkspace()}
+                placeholder="What is this workspace for?"
+                disabled={isUpdatingWs}
+                className="border-[#e4e4e0] focus-visible:ring-violet-300"
+              />
+            </div>
+
             <div className="pt-4 border-t border-[#e4e4e0] mt-4">
-              <label className="text-sm font-medium text-red-600 block mb-1.5">Danger Zone</label>
-              <p className="text-xs text-gray-500 mb-3">Deleting a workspace will immediately delete all of its projects and tasks. This cannot be undone.</p>
+              <label className="text-sm font-medium text-red-600 block mb-1.5">
+                Danger Zone
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Deleting a workspace will immediately delete all of its projects
+                and tasks. This cannot be undone.
+              </p>
               <button
                 onClick={() => setWsDeleteAlertOpen(true)}
                 className="w-full flex items-center justify-center gap-2 px-3 h-9 rounded-md text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
@@ -651,31 +894,70 @@ export default function Sidebar() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setWsSettingsOpen(false)} disabled={isUpdatingWs}>Cancel</Button>
-            <Button onClick={handleUpdateWorkspace} disabled={!editWsName.trim() || isUpdatingWs} className="bg-[#1a1a1a] hover:bg-[#333] text-white">
-              {isUpdatingWs ? <Loader2 size={14} className="mr-2 animate-spin" /> : 'Save Changes'}
+            <Button
+              variant="ghost"
+              onClick={() => setWsSettingsOpen(false)}
+              disabled={isUpdatingWs}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateWorkspace}
+              disabled={!editWsName.trim() || isUpdatingWs}
+              className="bg-[#1a1a1a] hover:bg-[#333] text-white"
+            >
+              {isUpdatingWs ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Workspace Confirm */}
-      <AlertDialog open={wsDeleteAlertOpen} onOpenChange={setWsDeleteAlertOpen}>
+      <AlertDialog
+        open={wsDeleteAlertOpen}
+        onOpenChange={(open) => {
+          setWsDeleteAlertOpen(open);
+          if (!open) setWsDeleteError("");
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the <strong>{activeWorkspace?.name}</strong> workspace, all of its projects, and all tasks within them. This action is destructive and cannot be undone.
+            <AlertDialogDescription asChild>
+              <div>
+                This will permanently delete the{" "}
+                <strong>{activeWorkspace?.name}</strong> workspace, all of its
+                projects, and all tasks within them. This action is destructive
+                and cannot be undone.
+                {wsDeleteError && (
+                  <div className="mt-3 p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm font-medium">
+                    {wsDeleteError}
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingWs}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingWs}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteWorkspace(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteWorkspace();
+              }}
               disabled={isDeletingWs}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              {isDeletingWs ? <Loader2 size={14} className="mr-2 animate-spin" /> : 'Delete Workspace'}
+              {isDeletingWs ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : (
+                "Delete Workspace"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -56,6 +56,12 @@ export default function BootGate({ children }) {
     return () => subscription.unsubscribe();
   }, [isAuthPage, router]);
 
+  useEffect(() => {
+    if (bootState === 'unauthenticated' && !isAuthPage) {
+      router.replace('/login');
+    }
+  }, [bootState, isAuthPage, router]);
+
   if (bootState === 'loading') {
     return <FullPageSkeleton />;
   }

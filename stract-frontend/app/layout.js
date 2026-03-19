@@ -3,6 +3,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { AppContextProvider } from '@/context/AppContext';
 import BootGate from '@/components/BootGate';
+import TaskDetailModal from '@/components/tasks/TaskDetailModal';
 import "./globals.css";
 
 export const metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({ children }) {
           <AppContextProvider>
             <BootGate>
               {children}
+              <TaskDetailModal />
             </BootGate>
             <Toaster
               position="bottom-right"

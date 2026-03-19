@@ -16,6 +16,7 @@ import { createTask } from '@/lib/api';
 export default function AddTaskInput({ status, onTaskAdded, onError, activeWorkspace, activeProject }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,9 +25,10 @@ export default function AddTaskInput({ status, onTaskAdded, onError, activeWorks
     if (!trimmed || !activeWorkspace?.id || !activeProject?.id) return;
     setIsSubmitting(true);
     try {
-      const result = await createTask(activeWorkspace.id, activeProject.id, trimmed, status, priority);
+      const result = await createTask(activeWorkspace.id, activeProject.id, trimmed, status, priority, description.trim());
       onTaskAdded(result.data);
       setTitle('');
+      setDescription('');
       setPriority('medium');
       setIsEditing(false);
     } catch (err) {
@@ -36,7 +38,7 @@ export default function AddTaskInput({ status, onTaskAdded, onError, activeWorks
     }
   };
 
-  const handleCancel = () => { setTitle(''); setPriority('medium'); setIsEditing(false); };
+  const handleCancel = () => { setTitle(''); setDescription(''); setPriority('medium'); setIsEditing(false); };
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSubmit();
     if (e.key === 'Escape') handleCancel();
@@ -65,7 +67,16 @@ export default function AddTaskInput({ status, onTaskAdded, onError, activeWorks
         placeholder="Task name..."
         autoFocus
         disabled={isSubmitting}
-        className="text-sm bg-white h-9 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
+        className="text-sm bg-white h-9 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400 mb-1.5"
+      />
+      <Input
+        type="text"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Description (optional)"
+        disabled={isSubmitting}
+        className="text-[13px] bg-white h-8 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
       />
       <div className="flex items-center gap-2 mt-2">
         {/* Priority selector */}

@@ -10,10 +10,13 @@ const AppContext = createContext({
   projects: [],
   workspaces: [],
   bootState: 'loading',  // 'loading' | 'unauthenticated' | 'no-workspace' | 'ready'
+  activeTaskId: null,
   setActiveWorkspace: () => {},
   setActiveProject: () => {},
   addWorkspace: () => {},
   refreshProjects: () => {},
+  openTask: () => {},
+  closeTask: () => {},
 });
 
 export function useApp() {
@@ -26,6 +29,10 @@ export function AppContextProvider({ children }) {
   const [activeWorkspace, setActiveWorkspaceState] = useState(null);
   const [activeProject, setActiveProjectState] = useState(null);
   const [bootState, setBootState] = useState('loading');
+  const [activeTaskId, setActiveTaskId] = useState(null);
+
+  const openTask = useCallback((id) => setActiveTaskId(id), []);
+  const closeTask = useCallback(() => setActiveTaskId(null), []);
 
   const loadProjects = useCallback(async (workspaceId, savedProjectId = null) => {
     try {
@@ -118,10 +125,13 @@ export function AppContextProvider({ children }) {
       workspaces,
       projects,
       bootState,
+      activeTaskId,
       setActiveWorkspace,
       setActiveProject,
       addWorkspace,
       refreshProjects,
+      openTask,
+      closeTask,
     }}>
       {children}
     </AppContext.Provider>

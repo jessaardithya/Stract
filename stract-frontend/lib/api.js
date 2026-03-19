@@ -62,20 +62,25 @@ export function deleteProject(workspaceId, id) {
 
 // ── Tasks (workspace-scoped) ──────────────────────────────────────────────────
 
+export function getTask(workspaceId, taskId) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${taskId}`);
+}
+
+
 export function getTasks(workspaceId, projectId, filters = {}) {
   const params = new URLSearchParams({ project_id: projectId, ...filters });
   return apiFetch(`/workspaces/${workspaceId}/tasks?${params}`);
 }
 
-export function createTask(workspaceId, projectId, title, status, priority = 'medium') {
+export function createTask(workspaceId, projectId, title, status, priority = 'medium', description = '') {
   return apiFetch(`/workspaces/${workspaceId}/tasks`, {
     method: 'POST',
-    body: JSON.stringify({ title, status, project_id: projectId, priority }),
+    body: JSON.stringify({ title, status, project_id: projectId, priority, description }),
   });
 }
 
-export function updateTask(workspaceId, id, title) {
-  return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+export function updateTask(workspaceId, id, data) {
+  return apiFetch(`/workspaces/${workspaceId}/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 }
 
 export function updateTaskPosition(workspaceId, id, status, prevPos, nextPos) {
@@ -97,4 +102,14 @@ export function getAnalytics(workspaceId, projectId) {
 // Legacy — used by SSE hook (non-workspace-scoped)
 export function fetchAnalytics() {
   return apiFetch(`/analytics/summary`);
+}
+
+// ── Members & Labels ──────────────────────────────────────────────────────────
+
+export function getMembers(workspaceId) {
+  return apiFetch(`/workspaces/${workspaceId}/members`);
+}
+
+export function getLabels(workspaceId) {
+  return apiFetch(`/workspaces/${workspaceId}/labels`);
 }

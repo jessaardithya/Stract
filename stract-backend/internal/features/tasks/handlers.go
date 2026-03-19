@@ -12,42 +12,69 @@ import (
 	"stract-backend/internal/core/events"
 )
 
-// Handler holds the dependencies for task routes (like the database connection).
+// Handler holds the dependencies for task routes.
 type Handler struct {
 	DB *pgxpool.Pool
 }
 
-// Task represents a task in the database
+// Assignee holds the user details for the assigned user.
+type Assignee struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	Name      *string `json:"name"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// Task represents a task — the canonical shape returned by all endpoints.
 type Task struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Status      string  `json:"status"`
-	Position    float64 `json:"position"`
-	CreatorID   string  `json:"creator_id"`
-	LastMovedAt string  `json:"last_moved_at"`
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	CreatorID   string    `json:"creator_id"`
+	AssigneeID  *string   `json:"assignee_id"`
+	Assignee    *Assignee `json:"assignee"`
+	Title       string    `json:"title"`
+	Description *string   `json:"description"`
+	Status      string    `json:"status"`
+	Priority    string    `json:"priority"`
+	Label       *string   `json:"label"`
+	Position    float64   `json:"position"`
+	StartDate   *string   `json:"start_date"`
+	DueDate     *string   `json:"due_date"`
+	LastMovedAt string    `json:"last_moved_at"`
+	CreatedAt   string    `json:"created_at"`
+	UpdatedAt   string    `json:"updated_at"`
+}
+
+// CreateTaskRequest represents the payload for creating a task.
+type CreateTaskRequest struct {
+	Title       string  `json:"title" binding:"required"`
+	Description *string `json:"description"`
+	Status      string  `json:"status" binding:"required"`
 	ProjectID   string  `json:"project_id"`
 	Priority    string  `json:"priority"`
+	Label       *string `json:"label"`
+	DueDate     *string `json:"due_date"`
+	StartDate   *string `json:"start_date"`
+	AssigneeID  *string `json:"assignee_id"`
 }
 
-// CreateTaskRequest represents the payload for creating a task
-type CreateTaskRequest struct {
-	Title     string `json:"title" binding:"required"`
-	Status    string `json:"status" binding:"required"`
-	ProjectID string `json:"project_id"`
-	Priority  string `json:"priority"`
-}
-
-// UpdatePositionRequest represents the payload for updating a task's position and status.
-// NextPos is a pointer so we can distinguish "absent / null" (dropped at bottom).
+// UpdatePositionRequest is the payload for the position-only PATCH.
 type UpdatePositionRequest struct {
 	PrevPos float64  `json:"prev_pos"`
 	NextPos *float64 `json:"next_pos"`
 	Status  string   `json:"status" binding:"required"`
 }
 
-// UpdateTaskRequest represents the payload for updating a task's title.
+// UpdateTaskRequest is the payload for the general-purpose PATCH.
 type UpdateTaskRequest struct {
-	Title string `json:"title" binding:"required"`
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Status      *string `json:"status"`
+	Priority    *string `json:"priority"`
+	Label       *string `json:"label"`
+	DueDate     *string `json:"due_date"`
+	StartDate   *string `json:"start_date"`
+	AssigneeID  *string `json:"assignee_id"`
 }
 
 // RegisterRoutes binds the legacy (non-workspace) task endpoints — kept for backward compat.
@@ -58,14 +85,13 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	{
 		tasksGroup.GET("", h.ListTasks)
 		tasksGroup.POST("", h.CreateTask)
-		tasksGroup.PATCH("/:id", h.UpdateTask)
+		tasksGroup.PATCH("/:id", h.LegacyUpdateTask)
 		tasksGroup.PATCH("/:id/position", h.UpdateTaskPosition)
 		tasksGroup.DELETE("/:id", h.DeleteTask)
 	}
 }
 
 // RegisterWorkspaceRoutes binds workspace-scoped task endpoints.
-// The router group must already have Auth + RequireWorkspaceMember middleware applied.
 func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := &Handler{DB: db}
 
@@ -73,13 +99,46 @@ func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	{
 		tasksGroup.GET("", h.WorkspaceListTasks)
 		tasksGroup.POST("", h.WorkspaceCreateTask)
-		tasksGroup.PATCH("/:id", h.UpdateTask) // title-only update, no chain validation needed
+		tasksGroup.GET("/:id", h.WorkspaceGetTask)
+		tasksGroup.PATCH("/:id", h.WorkspaceUpdateTask)
 		tasksGroup.PATCH("/:id/position", h.WorkspaceUpdateTaskPosition)
 		tasksGroup.DELETE("/:id", h.WorkspaceDeleteTask)
 	}
 }
 
-// ListTasks handles GET requests to retrieve tasks.
+// taskScanCols is a helper that scans all Task fields from a row.
+// Columns must be in the order: id, project_id, creator_id, assignee_id,
+// title, description, status, priority, label, position,
+// start_date, due_date, last_moved_at, created_at, updated_at
+func taskScanFull(row interface {
+	Scan(...interface{}) error
+}, t *Task) error {
+	var aID, aEmail, aName, aAvatar *string
+	err := row.Scan(
+		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
+		&t.Title, &t.Description, &t.Status, &t.Priority, &t.Label, &t.Position,
+		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
+		&aID, &aEmail, &aName, &aAvatar,
+	)
+	if err == nil && aID != nil && aEmail != nil {
+		t.Assignee = &Assignee{
+			ID:        *aID,
+			Email:     *aEmail,
+			Name:      aName,
+			AvatarURL: aAvatar,
+		}
+	}
+	return err
+}
+
+const fullTaskSelect = `
+SELECT t.id, t.project_id, t.creator_id, t.assignee_id,
+       t.title, t.description, t.status, COALESCE(t.priority,'medium'), t.label, t.position,
+       t.start_date::text, t.due_date::text,
+       COALESCE(t.last_moved_at::text,''), t.created_at::text, t.updated_at::text,
+       u.id, u.email, u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'avatar_url'`
+
+// ListTasks handles GET requests to retrieve tasks (legacy / backward compat).
 func (h *Handler) ListTasks(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -88,7 +147,9 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	}
 
 	rows, err := h.DB.Query(context.Background(),
-		"SELECT id, title, status, position, creator_id, COALESCE(last_moved_at::text, '') FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL ORDER BY position ASC",
+		fullTaskSelect+` FROM stract.tasks t
+		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 WHERE t.creator_id = $1 AND t.deleted_at IS NULL ORDER BY t.position ASC`,
 		userID,
 	)
 	if err != nil {
@@ -101,7 +162,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	var tasksList []Task
 	for rows.Next() {
 		var t Task
-		if err := rows.Scan(&t.ID, &t.Title, &t.Status, &t.Position, &t.CreatorID, &t.LastMovedAt); err != nil {
+		if err := taskScanFull(rows, &t); err != nil {
 			log.Printf("Error scanning task row: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse tasks"})
 			return
@@ -109,16 +170,14 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		tasksList = append(tasksList, t)
 	}
 
-	// Return empty slice instead of null if no tasks
 	if tasksList == nil {
 		tasksList = []Task{}
 	}
-
 	c.JSON(http.StatusOK, gin.H{"data": tasksList})
 }
 
-// UpdateTask handles PATCH requests to update a task's title.
-func (h *Handler) UpdateTask(c *gin.Context) {
+// LegacyUpdateTask handles PATCH for the legacy non-workspace route.
+func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 	id := c.Param("id")
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -134,13 +193,23 @@ func (h *Handler) UpdateTask(c *gin.Context) {
 
 	var updated Task
 	err := h.DB.QueryRow(context.Background(),
-		`UPDATE stract.tasks SET title = $1 WHERE id = $2 AND creator_id = $3
-		 RETURNING id, title, status, position, creator_id, COALESCE(last_moved_at::text, '')`,
-		req.Title, id, userID,
-	).Scan(&updated.ID, &updated.Title, &updated.Status, &updated.Position, &updated.CreatorID, &updated.LastMovedAt)
-
+		`UPDATE stract.tasks SET
+		   title       = COALESCE($1, title),
+		   description = COALESCE($2, description),
+		   updated_at  = NOW()
+		 WHERE id = $3 AND creator_id = $4`+
+			" RETURNING id, project_id, creator_id, assignee_id,"+
+			" title, description, status, COALESCE(priority,'medium'), label, position,"+
+			" start_date::text, due_date::text,"+
+			" COALESCE(last_moved_at::text,''), created_at::text, updated_at::text",
+		req.Title, req.Description, id, userID,
+	).Scan(
+		&updated.ID, &updated.ProjectID, &updated.CreatorID, &updated.AssigneeID,
+		&updated.Title, &updated.Description, &updated.Status, &updated.Priority, &updated.Label, &updated.Position,
+		&updated.StartDate, &updated.DueDate, &updated.LastMovedAt, &updated.CreatedAt, &updated.UpdatedAt,
+	)
 	if err != nil {
-		log.Printf("Error updating task title: %v", err)
+		log.Printf("Error updating task: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
@@ -157,9 +226,7 @@ func (h *Handler) UpdateTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": updated})
 }
 
-
-
-// CreateTask handles POST requests to create a new task.
+// CreateTask handles POST requests to create a new task (legacy).
 func (h *Handler) CreateTask(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -173,26 +240,35 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		return
 	}
 
-	// Calculate next position: MAX(position) + 65536 to preserve FLOAT8 midpoint space
+	priority := req.Priority
+	if priority == "" {
+		priority = "medium"
+	}
+
 	var nextPosition float64
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT COALESCE(MAX(position), 0) + 65536 FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL",
 		userID,
 	).Scan(&nextPosition)
-
 	if err != nil {
-		log.Printf("Error calculating position: %v", err)
 		nextPosition = 65536.0
 	}
 
 	var insertedTask Task
 	err = h.DB.QueryRow(context.Background(),
-		`INSERT INTO stract.tasks (title, status, position, creator_id)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, title, status, position, creator_id, COALESCE(last_moved_at::text, '')`,
-		req.Title, req.Status, nextPosition, userID,
-	).Scan(&insertedTask.ID, &insertedTask.Title, &insertedTask.Status, &insertedTask.Position, &insertedTask.CreatorID, &insertedTask.LastMovedAt)
-
+		`INSERT INTO stract.tasks (title, description, status, position, creator_id, priority, label, due_date, start_date, assignee_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		 RETURNING id, project_id, creator_id, assignee_id,
+		           title, description, status, COALESCE(priority,'medium'), label, position,
+		           start_date::text, due_date::text,
+		           COALESCE(last_moved_at::text,''), created_at::text, updated_at::text`,
+		req.Title, req.Description, req.Status, nextPosition, userID, priority,
+		req.Label, req.DueDate, req.StartDate, req.AssigneeID,
+	).Scan(
+		&insertedTask.ID, &insertedTask.ProjectID, &insertedTask.CreatorID, &insertedTask.AssigneeID,
+		&insertedTask.Title, &insertedTask.Description, &insertedTask.Status, &insertedTask.Priority, &insertedTask.Label, &insertedTask.Position,
+		&insertedTask.StartDate, &insertedTask.DueDate, &insertedTask.LastMovedAt, &insertedTask.CreatedAt, &insertedTask.UpdatedAt,
+	)
 	if err != nil {
 		log.Printf("Error inserting task: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create task"})
@@ -211,7 +287,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": insertedTask})
 }
 
-// UpdateTaskPosition handles PATCH requests to reorder a task using the midpoint algorithm.
+// UpdateTaskPosition handles PATCH to reorder a task using the midpoint algorithm.
 func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 	id := c.Param("id")
 	userID, exists := c.Get("user_id")
@@ -226,57 +302,38 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 		return
 	}
 
-	// --- Midpoint algorithm edge-case validation ---
-
-	// Determine nextPos value (default: dropped at bottom → prev + 65536)
 	var nextPos float64
 	if req.NextPos != nil {
 		nextPos = *req.NextPos
-
-		// prev >= next is invalid ordering
 		if req.PrevPos >= nextPos {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid position bounds"})
 			return
 		}
-
-		// Precision floor: gap too small to subdivide further
 		if nextPos-req.PrevPos < 0.001 {
 			c.JSON(http.StatusConflict, gin.H{"error": "position space exhausted, trigger rebalance"})
 			return
 		}
 	} else {
-		// Dropped at bottom
 		nextPos = req.PrevPos + 65536.0
 	}
-
 	newPos := (req.PrevPos + nextPos) / 2.0
 
-	// --- Fetch current status+title before update (for event emission) ---
 	var oldStatus, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT status, title FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
 	).Scan(&oldStatus, &taskTitle)
 	if err != nil {
-		log.Printf("Error fetching task status: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
 
-	// --- Perform update (set last_moved_at = NOW()) ---
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"UPDATE stract.tasks SET position = $1, status = $2, last_moved_at = NOW() WHERE id = $3 AND creator_id = $4",
+		"UPDATE stract.tasks SET position = $1, status = $2, last_moved_at = NOW(), updated_at = NOW() WHERE id = $3 AND creator_id = $4",
 		newPos, req.Status, id, userID,
 	)
-
-	if err != nil {
-		log.Printf("Error updating task position: %v", err)
+	if err != nil || cmdTag.RowsAffected() == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update task position"})
-		return
-	}
-
-	if cmdTag.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
 
@@ -293,7 +350,7 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Task position updated successfully", "position": newPos})
 }
 
-// DeleteTask handles DELETE requests for a specific task.
+// DeleteTask handles DELETE requests for a specific task (legacy).
 func (h *Handler) DeleteTask(c *gin.Context) {
 	id := c.Param("id")
 	userID, exists := c.Get("user_id")
@@ -302,14 +359,12 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	// --- Fetch current status+title before delete (for event emission) ---
 	var oldStatus, taskTitle string
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT status, title FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
 	).Scan(&oldStatus, &taskTitle)
 	if err != nil {
-		log.Printf("Error fetching task before delete: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
@@ -318,15 +373,8 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 		"DELETE FROM stract.tasks WHERE id = $1 AND creator_id = $2",
 		id, userID,
 	)
-
-	if err != nil {
-		log.Printf("Error deleting task: %v", err)
+	if err != nil || cmdTag.RowsAffected() == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete task"})
-		return
-	}
-
-	if cmdTag.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
 		return
 	}
 

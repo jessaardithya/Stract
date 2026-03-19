@@ -22,6 +22,7 @@ import (
 	"stract-backend/internal/features/projects"
 	"stract-backend/internal/features/tasks"
 	"stract-backend/internal/features/workspaces"
+	"stract-backend/internal/features/members"
 )
 
 func main() {
@@ -89,6 +90,9 @@ func main() {
 
 	// Analytics under workspace (project-scoped)
 	analytics.RegisterWorkspaceRoutes(wsGroup, db)
+
+	// Members & Labels under workspace
+	members.RegisterRoutes(wsGroup, db)
 
 	// ── SSE stream (query-param JWT auth, no standard middleware) ─────────────
 	apiV1SSE := r.Group("/api/v1")

@@ -17,8 +17,11 @@ function boardReducer(state, action) {
     case 'FETCH_ERROR':   return { ...state, loading: false, error: action.payload };
     case 'ADD_TASK':      return { ...state, tasks: [...state.tasks, action.payload] };
     case 'DELETE_TASK':   return { ...state, tasks: state.tasks.filter((t) => t.id !== action.payload) };
-    case 'RENAME_TASK':
-      return { ...state, tasks: state.tasks.map((t) => t.id === action.payload.id ? { ...t, title: action.payload.title } : t) };
+    case 'UPDATE_TASK':
+      return { 
+        ...state, 
+        tasks: state.tasks.map((t) => t.id === action.payload.id ? { ...t, ...action.payload } : t) 
+      };
     case 'SET_TASKS':     return { ...state, tasks: action.payload };
     case 'SET_ERROR':     return { ...state, error: action.payload };
     case 'CLEAR_ERROR':   return { ...state, error: null };
@@ -61,7 +64,10 @@ export default function Board() {
 
   useRealtime((event, isSelf) => {
     showEventToast(event);
-    if (!isSelf) load();
+    // Always refresh for updates/moves to ensure modal changes are reflected on the board
+    if (!isSelf || event.action === 'updated' || event.action === 'moved') {
+      load();
+    }
   }, mutationInFlightRef);
 
   const getColumnTasks = useCallback(
@@ -85,7 +91,7 @@ export default function Board() {
   }, [state.tasks, activeWorkspace?.id]);
 
   const handleTaskAdded = useCallback((task) => dispatch({ type: 'ADD_TASK', payload: task }), []);
-  const handleRename = useCallback((taskId, newTitle) => dispatch({ type: 'RENAME_TASK', payload: { id: taskId, title: newTitle } }), []);
+  const handleRename = useCallback((taskId, newTitle, newDesc) => dispatch({ type: 'UPDATE_TASK', payload: { id: taskId, title: newTitle, description: newDesc } }), []);
   const handleError = useCallback((msg) => dispatch({ type: 'SET_ERROR', payload: msg }), []);
 
   const handleDragEnd = useCallback(async (result) => {

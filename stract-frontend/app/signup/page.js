@@ -14,7 +14,8 @@ const friendlyError = (msg) => {
   if (msg.includes('Invalid login credentials')) return 'Incorrect email or password';
   if (msg.includes('Email not confirmed')) return 'Please confirm your email before signing in';
   if (msg.includes('User already registered')) return 'An account with this email already exists';
-  return 'Something went wrong. Please try again.';
+  if (msg.includes('Too many requests')) return 'Too many attempts. Please wait a bit and try again.';
+  return msg || 'Something went wrong. Please try again.';
 };
 
 export default function Signup() {

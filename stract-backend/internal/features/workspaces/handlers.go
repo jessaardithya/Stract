@@ -201,10 +201,25 @@ func (h *Handler) ArchiveWorkspace(c *gin.Context) {
 	workspaceID := c.Param("workspace_id")
 	userID, _ := c.Get("user_id")
 
+	var activeProjects int
+	countErr := h.DB.QueryRow(context.Background(),
+		"SELECT COUNT(*) FROM stract.projects WHERE workspace_id = $1 AND archived_at IS NULL",
+		workspaceID,
+	).Scan(&activeProjects)
+	if countErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify workspace contents"})
+		return
+	}
+	if activeProjects > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete workspace that contains active projects. Please delete the projects first."})
+		return
+	}
+
 	var w Workspace
 	err := h.DB.QueryRow(context.Background(),
 		`UPDATE stract.workspaces
-		 SET archived_at = NOW()
+		 SET archived_at = NOW(),
+		     slug = slug || '-deleted-' || id::text
 		 WHERE id = $1 AND owner_id = $2
 		 RETURNING id, name, slug, COALESCE(description,''), owner_id, created_at::text, archived_at::text`,
 		workspaceID, userID,
@@ -238,4 +253,3 @@ func containsStr(s, sub string) bool {
 
 // ensure time import is used (for future TTL work)
 var _ = time.Now
-
