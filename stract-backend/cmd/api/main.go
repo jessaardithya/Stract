@@ -111,6 +111,13 @@ func main() {
 
 	// ── SSE stream (query-param JWT auth, no standard middleware) ─────────────
 	apiV1SSE := r.Group("/api/v1")
+	apiV1SSE.Use(func(c *gin.Context) {
+		if token := c.Query("token"); token != "" {
+			c.Request.Header.Set("Authorization", "Bearer "+token)
+		}
+		c.Next()
+	})
+	apiV1SSE.Use(middleware.Auth())
 	apiV1SSE.GET("/stream", stream.StreamHandler(broker))
 
 	// ── HTTP server ───────────────────────────────────────────────────────────

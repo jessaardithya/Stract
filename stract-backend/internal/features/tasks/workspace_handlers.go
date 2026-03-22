@@ -381,7 +381,11 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 	}
 
 	var newStatusName string
-	_ = h.DB.QueryRow(context.Background(), "SELECT name FROM stract.project_statuses WHERE id = $1", req.StatusID).Scan(&newStatusName)
+	err = h.DB.QueryRow(context.Background(), "SELECT name FROM stract.project_statuses WHERE id = $1", req.StatusID).Scan(&newStatusName)
+	if err != nil {
+		log.Printf("[ws-tasks] failed to fetch new status name for event: %v", err)
+		newStatusName = "Unknown"
+	}
 
 	events.Emit(events.TaskEvent{
 		Timestamp:  time.Now(),
