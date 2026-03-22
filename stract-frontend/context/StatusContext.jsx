@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getStatuses } from '@/lib/api';
-import { useApp } from './AppContext';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { getStatuses } from "@/lib/api";
+import { useApp } from "./AppContext";
 
 const StatusContext = createContext();
 
@@ -23,10 +29,12 @@ export function StatusProvider({ children }) {
     try {
       const result = await getStatuses(activeWorkspace.id, activeProject.id);
       // Backend returns { data: [...] }
-      const sorted = (result.data || []).sort((a, b) => a.position - b.position);
+      const sorted = (result.data || []).sort(
+        (a, b) => a.position - b.position,
+      );
       setStatuses(sorted);
     } catch (err) {
-      console.error('Failed to fetch statuses:', err);
+      console.error("Failed to fetch statuses:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -38,7 +46,9 @@ export function StatusProvider({ children }) {
   }, [refreshStatuses]);
 
   return (
-    <StatusContext.Provider value={{ statuses, loading, error, refreshStatuses }}>
+    <StatusContext.Provider
+      value={{ statuses, loading, error, refreshStatuses }}
+    >
       {children}
     </StatusContext.Provider>
   );
@@ -47,7 +57,7 @@ export function StatusProvider({ children }) {
 export function useStatuses() {
   const context = useContext(StatusContext);
   if (!context) {
-    throw new Error('useStatuses must be used within a StatusProvider');
+    throw new Error("useStatuses must be used within a StatusProvider");
   }
   return context;
 }

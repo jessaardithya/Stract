@@ -42,6 +42,10 @@ import {
   Globe,
   LogOut,
   LayoutList,
+  AlertTriangle,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import {
@@ -71,6 +75,7 @@ const BOTTOM_NAV = [
 ];
 
 export default function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter(); // [NEW] routing fix
   const {
@@ -320,28 +325,53 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed top-0 left-0 h-screen w-[220px] z-40 bg-white border-r border-[#e4e4e0] flex flex-col">
+      <aside
+        className={`sticky top-0 h-screen z-40 bg-white border-r border-[#e4e4e0] flex flex-col shrink-0 transition-all duration-300 relative ${
+          isCollapsed ? "w-[68px]" : "w-[220px]"
+        }`}
+      >
+        {/* Collapse Toggle */}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-6 h-6 w-6 rounded-full border border-[#e4e4e0] bg-white flex items-center justify-center text-gray-400 hover:text-gray-900 shadow-sm z-50 transition-colors"
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+
         {/* Workspace Switcher */}
         <div className="h-14 flex items-center border-b border-[#e4e4e0] w-full group/wsheader">
           <Popover open={wsOpen} onOpenChange={setWsOpen}>
-            <PopoverTrigger className="flex-1 flex items-center gap-2.5 pl-4 pr-1 h-full hover:bg-[#f4f4f2] transition-colors text-left outline-none cursor-pointer">
+            <PopoverTrigger
+              className={`flex flex-1 items-center h-full hover:bg-[#f4f4f2] transition-all duration-300 text-left outline-none cursor-pointer ${
+                isCollapsed ? "justify-center" : "gap-2.5 pl-4 pr-1"
+              }`}
+            >
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
                 <span className="text-white text-xs font-bold">
                   {activeWorkspace?.name?.[0]?.toUpperCase() ?? "S"}
                 </span>
               </div>
-              <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
-                {activeWorkspace?.name ?? "Loading…"}
-              </span>
-              <ChevronsUpDown size={13} className="text-[#8a8a85] shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
+                    {activeWorkspace?.name ?? "Loading…"}
+                  </span>
+                  <ChevronsUpDown
+                    size={13}
+                    className="text-[#8a8a85] shrink-0"
+                  />
+                </>
+              )}
             </PopoverTrigger>
-            <button
-              onClick={openWsSettings}
-              className="px-3 h-full flex items-center justify-center text-[#8a8a85] opacity-0 group-hover/wsheader:opacity-100 hover:text-gray-900 transition-all outline-none"
-              title="Workspace Settings"
-            >
-              <Settings size={14} />
-            </button>
+            {!isCollapsed && (
+              <button
+                onClick={openWsSettings}
+                className="px-3 h-full flex items-center justify-center text-[#8a8a85] opacity-0 group-hover/wsheader:opacity-100 hover:text-gray-900 transition-all outline-none"
+                title="Workspace Settings"
+              >
+                <Settings size={14} />
+              </button>
+            )}
             <PopoverContent
               className="w-[200px] p-1.5"
               align="start"
@@ -401,9 +431,13 @@ export default function Sidebar() {
 
         {/* Project List */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-3 mb-1.5">
-            Projects
-          </p>
+          {!isCollapsed ? (
+            <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-3 mb-1.5 transition-all">
+              Projects
+            </p>
+          ) : (
+            <div className="h-4" />
+          )}
 
           {projects.map((p) => {
             const isActive = activeProject?.id === p.id;
@@ -415,28 +449,37 @@ export default function Sidebar() {
                     setActiveProject(p);
                     router.push("/");
                   }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100 text-left ${
+                  className={`flex items-center transition-all duration-100 text-left ${
+                    isCollapsed
+                      ? "w-10 h-10 justify-center mx-auto rounded-xl p-0 mb-1"
+                      : "w-full gap-2.5 px-3 py-2 rounded-lg"
+                  } text-sm font-medium ${
                     isActive
                       ? "text-gray-900 bg-[#f4f4f2]"
                       : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
                   }`}
+                  title={isCollapsed ? p.name : undefined}
                 >
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: p.color }}
                   />
-                  <span className="flex-1 truncate">{p.name}</span>
-                  {!isActive && count > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] h-4 px-1.5 font-medium"
-                    >
-                      {count}
-                    </Badge>
+                  {!isCollapsed && (
+                    <>
+                      <span className="flex-1 truncate">{p.name}</span>
+                      {!isActive && count > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] h-4 px-1.5 font-medium"
+                        >
+                          {count}
+                        </Badge>
+                      )}
+                    </>
                   )}
                 </button>
                 {/* Accordion Expanded State */}
-                {isActive && (
+                {isActive && !isCollapsed && (
                   <div
                     className="pl-6 pr-2 py-1 flex flex-col gap-0.5 border-l-2 ml-4 mt-0.5 mb-2"
                     style={{ borderColor: `${p.color}40` }}
@@ -466,7 +509,9 @@ export default function Sidebar() {
                     >
                       <LayoutList
                         size={13}
-                        className={pathname === "/list" ? `text-[${p.color}]` : ""}
+                        className={
+                          pathname === "/list" ? `text-[${p.color}]` : ""
+                        }
                         style={pathname === "/list" ? { color: p.color } : {}}
                       />
                       List View
@@ -485,7 +530,7 @@ export default function Sidebar() {
           })}
 
           {/* Inline new project */}
-          {showNewProject ? (
+          {showNewProject && !isCollapsed ? (
             <div className="px-2 mt-1">
               <Input
                 autoFocus
@@ -558,11 +603,19 @@ export default function Sidebar() {
             </div>
           ) : (
             <button
-              onClick={() => setShowNewProject(true)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-[#8a8a85] hover:text-gray-700 hover:bg-[#f4f4f2] rounded-lg transition-colors mt-0.5"
+              onClick={() => {
+                if (isCollapsed) setIsCollapsed(false);
+                setShowNewProject(true);
+              }}
+              className={`flex items-center transition-all text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2] rounded-lg mt-0.5 ${
+                isCollapsed
+                  ? "w-10 h-10 justify-center mx-auto rounded-xl p-0"
+                  : "w-full gap-2 px-3 py-1.5 text-[12px]"
+              }`}
+              title={isCollapsed ? "New Project" : undefined}
             >
-              <Plus size={12} />
-              New Project
+              <Plus size={12} className="shrink-0" />
+              {!isCollapsed && "New Project"}
             </button>
           )}
 
@@ -574,7 +627,12 @@ export default function Sidebar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-0.5 text-sm font-medium transition-colors ${
+                  title={isCollapsed ? label : undefined}
+                  className={`flex items-center transition-all rounded-lg mb-0.5 text-sm font-medium ${
+                    isCollapsed
+                      ? "w-10 h-10 justify-center mx-auto p-0 rounded-xl"
+                      : "w-full gap-3 px-3 py-2"
+                  } ${
                     active
                       ? "bg-violet-50 text-violet-700"
                       : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
@@ -582,9 +640,13 @@ export default function Sidebar() {
                 >
                   <Icon
                     size={15}
-                    className={active ? "text-violet-600" : "text-[#8a8a85]"}
+                    className={
+                      active
+                        ? "text-violet-600 shrink-0"
+                        : "text-[#8a8a85] shrink-0"
+                    }
                   />
-                  {label}
+                  {!isCollapsed && label}
                 </Link>
               );
             })}
@@ -592,18 +654,27 @@ export default function Sidebar() {
         </nav>
 
         {/* User */}
-        <div className="px-4 py-4 border-t border-[#e4e4e0] flex items-center gap-3">
-          <Avatar className="h-7 w-7 shrink-0">
+        <div
+          className={`py-4 border-t border-[#e4e4e0] flex items-center transition-all ${
+            isCollapsed ? "justify-center px-0" : "gap-3 px-4"
+          }`}
+        >
+          <Avatar
+            className="h-7 w-7 shrink-0 cursor-pointer"
+            title={isCollapsed ? "Jessa" : undefined}
+          >
             <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
               J
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate leading-tight">
-              Jessa
-            </p>
-            <p className="text-[11px] text-[#8a8a85] truncate">Free plan</p>
-          </div>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+                Jessa
+              </p>
+              <p className="text-[11px] text-[#8a8a85] truncate">Free plan</p>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -704,7 +775,7 @@ export default function Sidebar() {
         </DialogContent>
       </Dialog>
       {/* Project Settings Dialog */}
-      <Dialog open={projectSettingsOpen} onOpenChange={setProjectSettingsOpen}>
+      {/* <Dialog open={projectSettingsOpen} onOpenChange={setProjectSettingsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Project Settings</DialogTitle>
@@ -791,6 +862,173 @@ export default function Sidebar() {
             </Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog> */}
+
+      {/* Project Settings Dialog */}
+      <Dialog open={projectSettingsOpen} onOpenChange={setProjectSettingsOpen}>
+        <DialogContent className="sm:max-w-[420px] p-0 gap-0 overflow-hidden rounded-2xl border-black/[0.08] [&>button]:hidden">
+          <DialogTitle className="sr-only">Project settings</DialogTitle>
+          {/* Header */}
+          <div className="flex items-start justify-between px-6 pt-6 pb-0">
+            <div className="flex items-center gap-2.5">
+              <span
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ backgroundColor: editProjectColor }}
+              />
+              <div>
+                <h2 className="text-[16px] font-semibold text-zinc-900 tracking-tight leading-snug">
+                  Project settings
+                </h2>
+                <p className="text-[12px] text-zinc-400 mt-0.5 font-normal">
+                  {activeProject?.name}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setProjectSettingsOpen(false)}
+              className="w-7 h-7 flex items-center justify-center rounded-md bg-black/[0.04]
+                         text-zinc-500 hover:bg-black/[0.08] hover:text-zinc-800 transition-colors mt-0.5"
+            >
+              <X size={12} strokeWidth={2.2} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="px-6 pt-5 pb-0 space-y-4">
+            {/* Project Name */}
+            <div>
+              <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                Project name
+              </label>
+              <Input
+                value={editProjectName}
+                onChange={(e) => setEditProjectName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateProject()}
+                disabled={isUpdatingProject}
+                className="h-9 text-[13px] border-black/[0.12] rounded-lg shadow-none
+                           focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:border-violet-400
+                           placeholder:text-zinc-300 transition-all"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                Description{" "}
+                <span className="text-zinc-300 font-normal normal-case tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <Input
+                value={editProjectDescription}
+                onChange={(e) => setEditProjectDescription(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateProject()}
+                placeholder="What is this project?"
+                disabled={isUpdatingProject}
+                className="h-9 text-[13px] border-black/[0.12] rounded-lg shadow-none
+                           focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:border-violet-400
+                           placeholder:text-zinc-300 transition-all"
+              />
+            </div>
+
+            {/* Color */}
+            <div>
+              <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                Color
+              </label>
+              <div className="flex items-center gap-2 flex-wrap p-3 rounded-lg border border-black/[0.08] bg-zinc-50/80">
+                {PRESET_COLORS.map((color) => {
+                  const isSelected = editProjectColor === color;
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => setEditProjectColor(color)}
+                      className="relative transition-transform hover:scale-110"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        backgroundColor: color,
+                        border: isSelected
+                          ? `2px solid ${color}`
+                          : "1.5px solid rgba(0,0,0,0.08)",
+                        outline: isSelected ? `2px solid ${color}40` : "none",
+                        outlineOffset: 1,
+                      }}
+                    >
+                      {isSelected && (
+                        <Check
+                          size={11}
+                          className="absolute inset-0 m-auto text-white drop-shadow-sm"
+                          strokeWidth={3}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="rounded-[10px] bg-red-50/60 border border-red-200/50 p-4">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <AlertTriangle
+                  size={11}
+                  className="text-red-500"
+                  strokeWidth={2.5}
+                />
+                <span className="text-[10px] font-bold tracking-[0.09em] uppercase text-red-500">
+                  Danger zone
+                </span>
+              </div>
+              <p className="text-[12px] text-red-400/80 leading-relaxed mb-3">
+                Deleting this project permanently removes all of its tasks. This
+                cannot be undone.
+              </p>
+              <button
+                onClick={() => setProjectToDelete(activeProject)}
+                className="w-full h-[34px] flex items-center justify-center gap-1.5
+                           rounded-[7px] border border-red-300/50 bg-transparent
+                           text-[12px] font-semibold text-red-600
+                           hover:bg-red-100/60 hover:border-red-300
+                           transition-colors"
+              >
+                <Trash2 size={13} strokeWidth={2} />
+                Delete project
+              </button>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            className="flex items-center justify-end gap-2 px-6 py-4 mt-5
+                          border-t border-black/[0.06]"
+          >
+            <button
+              onClick={() => setProjectSettingsOpen(false)}
+              disabled={isUpdatingProject}
+              className="h-[34px] px-4 rounded-[7px] border border-black/[0.12] bg-transparent
+                         text-[13px] font-medium text-zinc-500
+                         hover:bg-black/[0.04] transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateProject}
+              disabled={!editProjectName.trim() || isUpdatingProject}
+              className="h-[34px] px-5 rounded-[7px] bg-zinc-900 border-none
+                         text-[13px] font-semibold text-white tracking-tight
+                         hover:bg-zinc-700 transition-colors
+                         disabled:opacity-40 disabled:cursor-not-allowed
+                         flex items-center gap-2"
+            >
+              {isUpdatingProject && (
+                <Loader2 size={13} className="animate-spin" />
+              )}
+              Save changes
+            </button>
+          </div>
+        </DialogContent>
       </Dialog>
 
       {/* Delete Project Confirm */}
@@ -806,7 +1044,7 @@ export default function Sidebar() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription as="div">
               <div>
                 This will permanently delete the{" "}
                 <strong>{projectToDelete?.name}</strong> project and all of its
@@ -841,7 +1079,7 @@ export default function Sidebar() {
         </AlertDialogContent>
       </AlertDialog>
       {/* Workspace Settings Dialog */}
-      <Dialog open={wsSettingsOpen} onOpenChange={setWsSettingsOpen}>
+      {/* <Dialog open={wsSettingsOpen} onOpenChange={setWsSettingsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Workspace Settings</DialogTitle>
@@ -915,7 +1153,130 @@ export default function Sidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+ */}
+      {/* Workspace Settings Dialog */}
+      <Dialog open={wsSettingsOpen} onOpenChange={setWsSettingsOpen}>
+        <DialogContent className="sm:max-w-[420px] p-0 gap-0 overflow-hidden rounded-2xl border-black/[0.08] [&>button]:hidden">
+          {/* Header */}
+          <DialogTitle className="sr-only">Workspace Settings</DialogTitle>
+          <div className="flex items-start justify-between px-6 pt-6 pb-0">
+            <div>
+              <h2 className="text-[16px] font-semibold text-zinc-900 tracking-tight leading-snug">
+                Workspace settings
+              </h2>
+              <p className="text-[12px] text-zinc-400 mt-0.5 font-normal">
+                {activeWorkspace?.name}
+              </p>
+            </div>
+            <button
+              onClick={() => setWsSettingsOpen(false)}
+              className="w-7 h-7 flex items-center justify-center rounded-md bg-black/[0.04]
+                         text-zinc-500 hover:bg-black/[0.08] hover:text-zinc-800 transition-colors mt-0.5"
+            >
+              <X size={12} strokeWidth={2.2} />
+            </button>
+          </div>
 
+          {/* Body */}
+          <div className="px-6 pt-5 pb-0 space-y-4">
+            {/* Workspace Name */}
+            <div>
+              <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                Workspace name
+              </label>
+              <Input
+                value={editWsName}
+                onChange={(e) => setEditWsName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateWorkspace()}
+                disabled={isUpdatingWs}
+                className="h-9 text-[13px] border-black/[0.12] rounded-lg shadow-none
+                           focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:border-violet-400
+                           placeholder:text-zinc-300 transition-all"
+              />
+              <p className="text-[11px] text-zinc-400 mt-1.5">
+                URL cannot be changed after creation.
+              </p>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                Description{" "}
+                <span className="text-zinc-300 font-normal normal-case tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <Input
+                value={editWsDescription}
+                onChange={(e) => setEditWsDescription(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUpdateWorkspace()}
+                placeholder="What is this workspace for?"
+                disabled={isUpdatingWs}
+                className="h-9 text-[13px] border-black/[0.12] rounded-lg shadow-none
+                           focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:border-violet-400
+                           placeholder:text-zinc-300 transition-all"
+              />
+            </div>
+
+            {/* Danger Zone */}
+            <div className="rounded-[10px] bg-red-50/60 border border-red-200/50 p-4">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <AlertTriangle
+                  size={11}
+                  className="text-red-500"
+                  strokeWidth={2.5}
+                />
+                <span className="text-[10px] font-bold tracking-[0.09em] uppercase text-red-500">
+                  Danger zone
+                </span>
+              </div>
+              <p className="text-[12px] text-red-400/80 leading-relaxed mb-3">
+                Deleting this workspace permanently removes all projects and
+                tasks. This cannot be undone.
+              </p>
+              <button
+                onClick={() => setWsDeleteAlertOpen(true)}
+                className="w-full h-[34px] flex items-center justify-center gap-1.5
+                           rounded-[7px] border border-red-300/50 bg-transparent
+                           text-[12px] font-semibold text-red-600
+                           hover:bg-red-100/60 hover:border-red-300
+                           transition-colors"
+              >
+                <Trash2 size={13} strokeWidth={2} />
+                Delete workspace
+              </button>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            className="flex items-center justify-end gap-2 px-6 py-4 mt-5
+                          border-t border-black/[0.06]"
+          >
+            <button
+              onClick={() => setWsSettingsOpen(false)}
+              disabled={isUpdatingWs}
+              className="h-[34px] px-4 rounded-[7px] border border-black/[0.12] bg-transparent
+                         text-[13px] font-medium text-zinc-500
+                         hover:bg-black/[0.04] transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateWorkspace}
+              disabled={!editWsName.trim() || isUpdatingWs}
+              className="h-[34px] px-5 rounded-[7px] bg-zinc-900 border-none
+                         text-[13px] font-semibold text-white tracking-tight
+                         hover:bg-zinc-700 transition-colors
+                         disabled:opacity-40 disabled:cursor-not-allowed
+                         flex items-center gap-2"
+            >
+              {isUpdatingWs && <Loader2 size={13} className="animate-spin" />}
+              Save changes
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Delete Workspace Confirm */}
       <AlertDialog
         open={wsDeleteAlertOpen}
@@ -927,7 +1288,7 @@ export default function Sidebar() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription as="div">
               <div>
                 This will permanently delete the{" "}
                 <strong>{activeWorkspace?.name}</strong> workspace, all of its

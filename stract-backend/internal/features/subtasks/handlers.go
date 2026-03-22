@@ -37,8 +37,8 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("", h.ListSubtasks)
 	router.POST("", h.CreateSubtask)
-	router.PATCH("/:id", h.UpdateSubtask)
-	router.DELETE("/:id", h.DeleteSubtask)
+	router.PATCH("/:subtaskId", h.UpdateSubtask)
+	router.DELETE("/:subtaskId", h.DeleteSubtask)
 }
 
 func (h *Handler) ListSubtasks(c *gin.Context) {
@@ -87,7 +87,7 @@ func (h *Handler) CreateSubtask(c *gin.Context) {
 }
 
 func (h *Handler) UpdateSubtask(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("subtaskId")
 	var req UpdateSubtaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -111,7 +111,7 @@ func (h *Handler) UpdateSubtask(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSubtask(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("subtaskId")
 	h.DB.Exec(context.Background(), "DELETE FROM stract.subtasks WHERE id = $1", id)
 	c.Status(http.StatusNoContent)
 }

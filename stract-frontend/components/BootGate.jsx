@@ -86,11 +86,11 @@ export default function BootGate({ children }) {
 
   // 'ready' — show sidebar + normal content
   return (
-    <>
+    <div className="flex w-full min-h-screen">
       <Sidebar />
-      <div className="ml-[220px] min-h-screen">
+      <div className="flex-1 w-0 flex flex-col min-h-screen bg-[#fafaf8]">
         {children}
       </div>
-    </>
+    </div>
   );
 }
