@@ -17,6 +17,29 @@ type Handler struct {
 	DB *pgxpool.Pool
 }
 
+func (h *Handler) resolveProgressStatus(ctx context.Context, projectID, statusID string) (string, error) {
+	var progress string
+	err := h.DB.QueryRow(ctx,
+		`WITH ordered AS (
+			SELECT
+				id,
+				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+				COUNT(*) OVER () AS total_count
+			FROM stract.project_statuses
+			WHERE project_id = $1
+		)
+		SELECT CASE
+			WHEN row_num = 1 THEN 'todo'
+			WHEN row_num = total_count THEN 'done'
+			ELSE 'in-progress'
+		END
+		FROM ordered
+		WHERE id = $2`,
+		projectID, statusID,
+	).Scan(&progress)
+	return progress, err
+}
+
 // Assignee holds the user details for the assigned user.
 type Assignee struct {
 	ID        string  `json:"id"`
@@ -203,6 +226,26 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 		return
 	}
 
+	progressStatus := ""
+	if req.StatusID != nil {
+		var projectID string
+		err := h.DB.QueryRow(context.Background(),
+			"SELECT project_id FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+			id, userID,
+		).Scan(&projectID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
+			return
+		}
+
+		progressStatus, err = h.resolveProgressStatus(context.Background(), projectID, *req.StatusID)
+		if err != nil {
+			log.Printf("Error resolving task progress status: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status_id for this project"})
+			return
+		}
+	}
+
 	var updated Task
 	var aID, aEmail, aName, aAvatar *string
 	err := h.DB.QueryRow(context.Background(),
@@ -211,8 +254,9 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 			  title       = COALESCE($1, title),
 			  description = COALESCE($2, description),
 			  status_id   = COALESCE($3, status_id),
+			  status      = COALESCE(NULLIF($4, ''), status),
 			  updated_at  = NOW()
-			WHERE id = $4 AND creator_id = $5
+			WHERE id = $5 AND creator_id = $6
 			RETURNING id, project_id, creator_id, assignee_id,
 			          title, description, status_id, COALESCE(priority,'medium'), label, position,
 			          start_date::text, due_date::text,
@@ -223,7 +267,7 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 		FROM upd
 		LEFT JOIN auth.users u ON u.id = upd.assignee_id
 		JOIN stract.project_statuses ps ON ps.id = upd.status_id`,
-		req.Title, req.Description, req.StatusID, id, userID,
+		req.Title, req.Description, req.StatusID, progressStatus, id, userID,
 	).Scan(
 		&updated.ID, &updated.ProjectID, &updated.CreatorID, &updated.AssigneeID,
 		&updated.Title, &updated.Description, &updated.StatusID, &updated.Priority, &updated.Label, &updated.Position,
@@ -276,8 +320,15 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		priority = "medium"
 	}
 
+	progressStatus, err := h.resolveProgressStatus(context.Background(), req.ProjectID, req.StatusID)
+	if err != nil {
+		log.Printf("Error resolving task progress status: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status_id for this project"})
+		return
+	}
+
 	var nextPosition float64
-	err := h.DB.QueryRow(context.Background(),
+	err = h.DB.QueryRow(context.Background(),
 		"SELECT COALESCE(MAX(position), 0) + 65536 FROM stract.tasks WHERE creator_id = $1 AND deleted_at IS NULL",
 		userID,
 	).Scan(&nextPosition)
@@ -289,8 +340,8 @@ func (h *Handler) CreateTask(c *gin.Context) {
 	var aID, aEmail, aName, aAvatar *string
 	err = h.DB.QueryRow(context.Background(),
 		`WITH ins AS (
-			INSERT INTO stract.tasks (title, description, status_id, position, creator_id, priority, label, due_date, start_date, assignee_id, project_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			INSERT INTO stract.tasks (title, description, status, status_id, position, creator_id, priority, label, due_date, start_date, assignee_id, project_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			RETURNING id, project_id, creator_id, assignee_id,
 			          title, description, status_id, COALESCE(priority,'medium'), label, position,
 			          start_date::text, due_date::text,
@@ -301,7 +352,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		FROM ins
 		LEFT JOIN auth.users u ON u.id = ins.assignee_id
 		JOIN stract.project_statuses ps ON ps.id = ins.status_id`,
-		req.Title, req.Description, req.StatusID, nextPosition, userID, priority,
+		req.Title, req.Description, progressStatus, req.StatusID, nextPosition, userID, priority,
 		req.Label, req.DueDate, req.StartDate, req.AssigneeID, req.ProjectID,
 	).Scan(
 		&insertedTask.ID, &insertedTask.ProjectID, &insertedTask.CreatorID, &insertedTask.AssigneeID,
@@ -368,6 +419,7 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 	newPos := (req.PrevPos + nextPos) / 2.0
 
 	var oldStatusName, taskTitle string
+	var projectID string
 	err := h.DB.QueryRow(context.Background(),
 		`SELECT ps.name, t.title FROM stract.tasks t
 		 JOIN stract.project_statuses ps ON ps.id = t.status_id
@@ -379,9 +431,25 @@ func (h *Handler) UpdateTaskPosition(c *gin.Context) {
 		return
 	}
 
+	err = h.DB.QueryRow(context.Background(),
+		"SELECT project_id FROM stract.tasks WHERE id = $1 AND creator_id = $2",
+		id, userID,
+	).Scan(&projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found or not owned by user"})
+		return
+	}
+
+	progressStatus, err := h.resolveProgressStatus(context.Background(), projectID, req.StatusID)
+	if err != nil {
+		log.Printf("Error resolving task progress status: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status_id for this project"})
+		return
+	}
+
 	cmdTag, err := h.DB.Exec(context.Background(),
-		"UPDATE stract.tasks SET position = $1, status_id = $2, last_moved_at = NOW(), updated_at = NOW() WHERE id = $3 AND creator_id = $4",
-		newPos, req.StatusID, id, userID,
+		"UPDATE stract.tasks SET position = $1, status_id = $2, status = $3, last_moved_at = NOW(), updated_at = NOW() WHERE id = $4 AND creator_id = $5",
+		newPos, req.StatusID, progressStatus, id, userID,
 	)
 	if err != nil || cmdTag.RowsAffected() == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update task position"})

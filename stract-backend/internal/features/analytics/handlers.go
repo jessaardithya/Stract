@@ -39,13 +39,13 @@ type Handler struct {
 	cachedValue *Summary
 
 	// workspace-scoped cache keyed by "workspaceID:projectID"
-	wsMu       sync.Mutex
-	wsCache    map[string]*wsCacheEntry
+	wsMu    sync.Mutex
+	wsCache map[string]*wsCacheEntry
 }
 
 type wsCacheEntry struct {
-	value     *WorkspaceSummary
-	cachedAt  time.Time
+	value    *WorkspaceSummary
+	cachedAt time.Time
 }
 
 func NewHandler(db *pgxpool.Pool) *Handler {
@@ -176,9 +176,10 @@ func (h *Handler) compute(ctx context.Context, userID string) (*Summary, error) 
 func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*WorkspaceSummary, error) {
 	// Status counts
 	rows, err := h.DB.Query(ctx,
-		`SELECT ps.name, COUNT(*) FROM stract.tasks t
-		 JOIN stract.project_statuses ps ON ps.id = t.status_id
-		 WHERE t.project_id = $1 AND t.deleted_at IS NULL GROUP BY ps.name`,
+		`SELECT COALESCE(NULLIF(t.status, ''), 'todo'), COUNT(*)
+		 FROM stract.tasks t
+		 WHERE t.project_id = $1 AND t.deleted_at IS NULL
+		 GROUP BY COALESCE(NULLIF(t.status, ''), 'todo')`,
 		projectID,
 	)
 	if err != nil {
@@ -186,12 +187,14 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 	}
 	defer rows.Close()
 
-	byStatus := make(map[string]int)
+	byStatus := map[string]int{"todo": 0, "in-progress": 0, "done": 0}
 	totalActive := 0
 	for rows.Next() {
 		var statusName string
 		var count int
-		rows.Scan(&statusName, &count)
+		if err := rows.Scan(&statusName, &count); err != nil {
+			return nil, err
+		}
 		byStatus[statusName] = count
 		totalActive += count
 	}
@@ -216,25 +219,23 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 	var velocity7d, staleCount int
 	h.DB.QueryRow(ctx,
 		`SELECT COUNT(*) FROM stract.tasks t
-		 JOIN stract.project_statuses ps ON ps.id = t.status_id
-		 WHERE t.project_id = $1 AND ps.name = 'Done'
+		 WHERE t.project_id = $1 AND COALESCE(NULLIF(t.status, ''), 'todo') = 'done'
 		 AND t.deleted_at IS NULL AND t.last_moved_at >= NOW() - INTERVAL '7 days'`, projectID,
 	).Scan(&velocity7d)
 	h.DB.QueryRow(ctx,
 		`SELECT COUNT(*) FROM stract.tasks t
-		 JOIN stract.project_statuses ps ON ps.id = t.status_id
-		 WHERE t.project_id = $1 AND ps.name != 'Done'
+		 WHERE t.project_id = $1 AND COALESCE(NULLIF(t.status, ''), 'todo') != 'done'
 		 AND t.deleted_at IS NULL AND t.last_moved_at < NOW() - INTERVAL '3 days'`, projectID,
 	).Scan(&staleCount)
 
 	// Completion rate = done / total * 100
 	completionRate := 0.0
-	doneCount := byStatus["Done"]
+	doneCount := byStatus["done"]
 	if totalActive > 0 {
 		completionRate = float64(doneCount) / float64(totalActive) * 100.0
 	}
 
-	health := deriveHealth(byStatus["Todo"], byStatus["In Progress"])
+	health := deriveHealth(byStatus["todo"], byStatus["in-progress"])
 	return &WorkspaceSummary{
 		ProjectID:      projectID,
 		TotalActive:    totalActive,
