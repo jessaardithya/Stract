@@ -180,13 +180,24 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		return
 	}
 
-	rows, err := h.DB.Query(context.Background(),
-		fullTaskSelect+` FROM stract.tasks t
+	query := fullTaskSelect + ` FROM stract.tasks t
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
 		 JOIN stract.project_statuses ps ON ps.id = t.status_id
-		 WHERE t.creator_id = $1 AND t.deleted_at IS NULL ORDER BY ps.position ASC, t.position ASC`,
-		userID,
-	)
+		 WHERE t.creator_id = $1 AND t.deleted_at IS NULL`
+	if hasDates := c.Query("has_dates"); hasDates != "" {
+		switch hasDates {
+		case "true":
+			query += " AND t.start_date IS NOT NULL AND t.due_date IS NOT NULL"
+		case "false":
+			query += " AND (t.start_date IS NULL OR t.due_date IS NULL)"
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "has_dates must be either true or false"})
+			return
+		}
+	}
+	query += " ORDER BY ps.position ASC, t.position ASC"
+
+	rows, err := h.DB.Query(context.Background(), query, userID)
 	if err != nil {
 		log.Printf("Error querying tasks: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tasks"})

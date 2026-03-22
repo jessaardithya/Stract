@@ -202,7 +202,7 @@ export default function Dashboard() {
 
       try {
         const result = await getAnalytics(workspaceId, projectId);
-        setData(result.data);
+        setData(result);
         setError(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
@@ -231,12 +231,12 @@ export default function Dashboard() {
       ? (HEALTH[data.backlog_health as keyof typeof HEALTH] ?? HEALTH.good)
       : HEALTH.good;
 
-  const totalActive = data?.total_active ?? 0;
-  const total = Math.max(totalActive, 1);
-
   const todoCount = data?.by_status?.todo ?? 0;
   const inProgressCount = data?.by_status?.["in-progress"] ?? 0;
   const doneCount = data?.by_status?.done ?? 0;
+  const totalActive = data?.total_active ?? 0;
+  const totalTasks = todoCount + inProgressCount + doneCount;
+  const total = Math.max(totalTasks, 1);
 
   const todoPct = Math.round((todoCount / total) * 100);
   const inProgressPct = Math.round((inProgressCount / total) * 100);
@@ -253,7 +253,7 @@ export default function Dashboard() {
     data?.completion_rate != null ? Math.round(data.completion_rate) : null;
 
   const dominantLane =
-    totalActive === 0
+    totalTasks === 0
       ? "No active work"
       : [
           { label: "Todo", count: todoCount },
@@ -572,7 +572,7 @@ export default function Dashboard() {
                         : status.key === "in-progress"
                           ? inProgressCount
                           : doneCount;
-                    const pct = totalActive > 0 ? Math.round((count / totalActive) * 100) : 0;
+                    const pct = totalTasks > 0 ? Math.round((count / totalTasks) * 100) : 0;
 
                     return (
                       <div

@@ -67,7 +67,7 @@ export default function AddTaskInput({ statusId, taskCount, onTaskAdded, onError
       <Button
         variant="ghost"
         onClick={() => setIsEditing(true)}
-        className="w-full mt-2 h-9 justify-start text-sm text-[#8a8a85] hover:text-gray-700 hover:bg-[#ebebE8] border border-dashed border-[#c9c9c4] hover:border-[#9ca3af] rounded-lg gap-2 transition-all duration-150"
+        className="mt-3 h-10 w-full justify-start gap-2 rounded-xl border border-dashed border-[#d8d1c5] text-sm text-[#8a8a85] transition-all duration-150 hover:border-[#b7aea1] hover:bg-[#f7f3ec] hover:text-[#2a241c]"
       >
         <Plus size={14} />
         Add task
@@ -85,7 +85,7 @@ export default function AddTaskInput({ statusId, taskCount, onTaskAdded, onError
         placeholder="Task name..."
         autoFocus
         disabled={isSubmitting}
-        className="text-sm bg-white h-9 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400 mb-1.5"
+        className="mb-1.5 h-9 border-[#e6dfd2] bg-[#fbfaf7] text-sm focus-visible:border-violet-400 focus-visible:ring-violet-300"
       />
       <Input
         type="text"
@@ -94,12 +94,12 @@ export default function AddTaskInput({ statusId, taskCount, onTaskAdded, onError
         onKeyDown={handleKeyDown}
         placeholder="Description (optional)"
         disabled={isSubmitting}
-        className="text-[13px] bg-white h-8 border-[#e4e4e0] focus-visible:ring-violet-300 focus-visible:border-violet-400"
+        className="h-8 border-[#e6dfd2] bg-[#fbfaf7] text-[13px] focus-visible:border-violet-400 focus-visible:ring-violet-300"
       />
       <div className="flex items-center gap-2 mt-2">
         {/* Priority selector */}
         <Select value={priority} onValueChange={(v) => setPriority(v as Priority)} disabled={isSubmitting}>
-          <SelectTrigger className="h-7 text-xs w-[100px] border-[#e4e4e0] focus:ring-violet-300">
+          <SelectTrigger className="h-7 w-[100px] border-[#e6dfd2] bg-[#fbfaf7] text-xs focus:ring-violet-300">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -128,7 +128,7 @@ export default function AddTaskInput({ statusId, taskCount, onTaskAdded, onError
           size="sm"
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
-          className="h-7 text-xs px-3 bg-[#1a1a1a] hover:bg-[#333] text-white"
+          className="h-7 bg-[#1f1b17] px-3 text-xs text-white hover:bg-[#35302a]"
         >
           <Check size={11} className="mr-1" />
           {isSubmitting ? 'Adding…' : 'Add'}
@@ -138,7 +138,7 @@ export default function AddTaskInput({ statusId, taskCount, onTaskAdded, onError
           size="sm"
           onClick={handleCancel}
           disabled={isSubmitting}
-          className="h-7 text-xs px-2 text-[#8a8a85] hover:text-gray-700"
+          className="h-7 px-2 text-xs text-[#8a8a85] hover:text-[#2a241c]"
         >
           <X size={11} className="mr-1" />
           Cancel

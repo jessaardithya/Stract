@@ -174,12 +174,32 @@ func (h *Handler) compute(ctx context.Context, userID string) (*Summary, error) 
 
 // computeWorkspace builds the Phase 5 project-scoped summary.
 func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*WorkspaceSummary, error) {
-	// Status counts
+	// Status counts are derived from the current column order:
+	// first column = todo, last = done, anything in between = in-progress.
 	rows, err := h.DB.Query(ctx,
-		`SELECT COALESCE(NULLIF(t.status, ''), 'todo'), COUNT(*)
-		 FROM stract.tasks t
-		 WHERE t.project_id = $1 AND t.deleted_at IS NULL
-		 GROUP BY COALESCE(NULLIF(t.status, ''), 'todo')`,
+		`WITH ordered_statuses AS (
+			SELECT
+				id,
+				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+				COUNT(*) OVER () AS total_count
+			FROM stract.project_statuses
+			WHERE project_id = $1
+		),
+		status_buckets AS (
+			SELECT
+				id,
+				CASE
+					WHEN row_num = 1 THEN 'todo'
+					WHEN row_num = total_count THEN 'done'
+					ELSE 'in-progress'
+				END AS bucket
+			FROM ordered_statuses
+		)
+		SELECT sb.bucket, COUNT(*)
+		FROM stract.tasks t
+		JOIN status_buckets sb ON sb.id = t.status_id
+		WHERE t.project_id = $1 AND t.deleted_at IS NULL
+		GROUP BY sb.bucket`,
 		projectID,
 	)
 	if err != nil {
@@ -196,12 +216,36 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 			return nil, err
 		}
 		byStatus[statusName] = count
-		totalActive += count
 	}
+	totalActive = byStatus["todo"] + byStatus["in-progress"]
 
-	// Priority counts
+	// Priority counts only include active work.
 	prows, err := h.DB.Query(ctx,
-		`SELECT COALESCE(priority,'medium'), COUNT(*) FROM stract.tasks WHERE project_id = $1 AND deleted_at IS NULL GROUP BY priority`,
+		`WITH ordered_statuses AS (
+			SELECT
+				id,
+				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+				COUNT(*) OVER () AS total_count
+			FROM stract.project_statuses
+			WHERE project_id = $1
+		),
+		status_buckets AS (
+			SELECT
+				id,
+				CASE
+					WHEN row_num = 1 THEN 'todo'
+					WHEN row_num = total_count THEN 'done'
+					ELSE 'in-progress'
+				END AS bucket
+			FROM ordered_statuses
+		)
+		SELECT COALESCE(t.priority, 'medium'), COUNT(*)
+		FROM stract.tasks t
+		JOIN status_buckets sb ON sb.id = t.status_id
+		WHERE t.project_id = $1
+		  AND t.deleted_at IS NULL
+		  AND sb.bucket != 'done'
+		GROUP BY COALESCE(t.priority, 'medium')`,
 		projectID,
 	)
 	if err != nil {
@@ -212,27 +256,74 @@ func (h *Handler) computeWorkspace(ctx context.Context, projectID string) (*Work
 	for prows.Next() {
 		var p string
 		var c int
-		prows.Scan(&p, &c)
+		if err := prows.Scan(&p, &c); err != nil {
+			return nil, err
+		}
 		byPriority[p] = c
 	}
 
 	var velocity7d, staleCount int
 	h.DB.QueryRow(ctx,
-		`SELECT COUNT(*) FROM stract.tasks t
-		 WHERE t.project_id = $1 AND COALESCE(NULLIF(t.status, ''), 'todo') = 'done'
-		 AND t.deleted_at IS NULL AND t.last_moved_at >= NOW() - INTERVAL '7 days'`, projectID,
+		`WITH ordered_statuses AS (
+			SELECT
+				id,
+				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+				COUNT(*) OVER () AS total_count
+			FROM stract.project_statuses
+			WHERE project_id = $1
+		),
+		status_buckets AS (
+			SELECT
+				id,
+				CASE
+					WHEN row_num = 1 THEN 'todo'
+					WHEN row_num = total_count THEN 'done'
+					ELSE 'in-progress'
+				END AS bucket
+			FROM ordered_statuses
+		)
+		SELECT COUNT(*)
+		FROM stract.tasks t
+		JOIN status_buckets sb ON sb.id = t.status_id
+		WHERE t.project_id = $1
+		  AND sb.bucket = 'done'
+		  AND t.deleted_at IS NULL
+		  AND t.last_moved_at >= NOW() - INTERVAL '7 days'`, projectID,
 	).Scan(&velocity7d)
 	h.DB.QueryRow(ctx,
-		`SELECT COUNT(*) FROM stract.tasks t
-		 WHERE t.project_id = $1 AND COALESCE(NULLIF(t.status, ''), 'todo') != 'done'
-		 AND t.deleted_at IS NULL AND t.last_moved_at < NOW() - INTERVAL '3 days'`, projectID,
+		`WITH ordered_statuses AS (
+			SELECT
+				id,
+				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+				COUNT(*) OVER () AS total_count
+			FROM stract.project_statuses
+			WHERE project_id = $1
+		),
+		status_buckets AS (
+			SELECT
+				id,
+				CASE
+					WHEN row_num = 1 THEN 'todo'
+					WHEN row_num = total_count THEN 'done'
+					ELSE 'in-progress'
+				END AS bucket
+			FROM ordered_statuses
+		)
+		SELECT COUNT(*)
+		FROM stract.tasks t
+		JOIN status_buckets sb ON sb.id = t.status_id
+		WHERE t.project_id = $1
+		  AND sb.bucket != 'done'
+		  AND t.deleted_at IS NULL
+		  AND t.last_moved_at < NOW() - INTERVAL '3 days'`, projectID,
 	).Scan(&staleCount)
 
-	// Completion rate = done / total * 100
+	// Completion rate = done / total tasks * 100.
 	completionRate := 0.0
 	doneCount := byStatus["done"]
-	if totalActive > 0 {
-		completionRate = float64(doneCount) / float64(totalActive) * 100.0
+	totalTasks := byStatus["todo"] + byStatus["in-progress"] + byStatus["done"]
+	if totalTasks > 0 {
+		completionRate = float64(doneCount) / float64(totalTasks) * 100.0
 	}
 
 	health := deriveHealth(byStatus["todo"], byStatus["in-progress"])

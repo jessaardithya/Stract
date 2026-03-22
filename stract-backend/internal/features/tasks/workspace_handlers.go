@@ -53,6 +53,17 @@ func (h *Handler) WorkspaceListTasks(c *gin.Context) {
 		args = append(args, priority)
 		argIdx++
 	}
+	if hasDates := c.Query("has_dates"); hasDates != "" {
+		switch hasDates {
+		case "true":
+			query += " AND t.start_date IS NOT NULL AND t.due_date IS NOT NULL"
+		case "false":
+			query += " AND (t.start_date IS NULL OR t.due_date IS NULL)"
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "has_dates must be either true or false"})
+			return
+		}
+	}
 	if c.Query("stale") == "true" {
 		query += " AND t.last_moved_at < NOW() - INTERVAL '3 days'"
 	}

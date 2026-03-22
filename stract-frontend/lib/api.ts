@@ -252,5 +252,7 @@ export const createComment = (
 export const getAnalytics = (
   workspaceId: string,
   projectId: string
-): Promise<ApiResponse<AnalyticsSummary>> =>
-  apiFetch(`/api/v1/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`);
+): Promise<AnalyticsSummary> =>
+  apiFetch<AnalyticsSummary | ApiResponse<AnalyticsSummary>>(
+    `/api/v1/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`,
+  ).then((result) => ("data" in result ? result.data : result));

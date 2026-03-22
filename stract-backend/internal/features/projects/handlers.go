@@ -63,14 +63,35 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		   p.id, p.workspace_id, p.name, COALESCE(p.description,''), p.color, p.creator_id,
 		   p.created_at::text, p.archived_at::text,
 		   (
-		     SELECT COALESCE(jsonb_object_agg(ps.name, t_counts.cnt), '{}'::jsonb)
+		     SELECT COALESCE(
+		       jsonb_object_agg(bucket_counts.bucket, bucket_counts.cnt),
+		       '{"todo":0,"in-progress":0,"done":0}'::jsonb
+		     )
 		     FROM (
-		       SELECT status_id, COUNT(*) as cnt
-		       FROM stract.tasks
-		       WHERE project_id = p.id AND deleted_at IS NULL
-		       GROUP BY status_id
-		     ) t_counts
-		     JOIN stract.project_statuses ps ON ps.id = t_counts.status_id
+		       WITH ordered_statuses AS (
+		         SELECT
+		           id,
+		           ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
+		           COUNT(*) OVER () AS total_count
+		         FROM stract.project_statuses
+		         WHERE project_id = p.id
+		       ),
+		       status_buckets AS (
+		         SELECT
+		           id,
+		           CASE
+		             WHEN row_num = 1 THEN 'todo'
+		             WHEN row_num = total_count THEN 'done'
+		             ELSE 'in-progress'
+		           END AS bucket
+		         FROM ordered_statuses
+		       )
+		       SELECT sb.bucket, COUNT(*) AS cnt
+		       FROM stract.tasks t
+		       JOIN status_buckets sb ON sb.id = t.status_id
+		       WHERE t.project_id = p.id AND t.deleted_at IS NULL
+		       GROUP BY sb.bucket
+		     ) AS bucket_counts
 		   ) AS task_counts
 		 FROM stract.projects p
 		 WHERE p.workspace_id = $1

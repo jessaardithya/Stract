@@ -78,11 +78,11 @@ export default function Column({ statusId, statusName, statusColor, tasks, onDel
   };
 
   return (
-    <div className="flex flex-col w-[300px] min-w-[300px] rounded-xl bg-[#f4f4f2] border border-[#e4e4e0] p-4 max-h-[calc(100vh-160px)]">
+    <div className="flex max-h-[calc(100vh-220px)] w-[320px] min-w-[320px] flex-col rounded-[20px] border border-[#e7e2d8] bg-white p-4">
       {/* Column Header */}
       <div className="flex items-center justify-between mb-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor || '#9ca3af' }} />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor || '#9ca3af' }} />
           {isRenaming ? (
             <Input
               ref={renameInputRef}
@@ -93,26 +93,26 @@ export default function Column({ statusId, statusName, statusColor, tasks, onDel
                 if (e.key === 'Enter') handleStatusRename();
                 if (e.key === 'Escape') { setIsRenaming(false); setNewName(statusName); }
               }}
-              className="h-7 text-sm font-medium px-1 bg-white border-[#e4e4e0] focus-visible:ring-violet-300"
+              className="h-8 border-[#e6dfd2] bg-[#fbfaf7] px-2 text-sm font-medium focus-visible:ring-violet-300"
             />
           ) : (
             <span 
-              className="text-sm font-medium text-gray-700 truncate cursor-pointer hover:text-gray-900" 
+              className="cursor-pointer truncate text-sm font-semibold text-[#2a241c] hover:text-black" 
               onDoubleClick={() => setIsRenaming(true)}
             >
               {statusName}
             </span>
           )}
-          <Badge variant="secondary" className="text-xs font-semibold px-1.5 min-w-[22px] h-5 flex items-center justify-center">
+          <Badge variant="secondary" className="flex h-5 min-w-[22px] items-center justify-center bg-[#f4efe6] px-1.5 text-xs font-semibold text-[#6c6457]">
             {tasks.length}
           </Badge>
         </div>
         
         <DropdownMenu>
-          <DropdownMenuTrigger className="h-7 w-7 flex items-center justify-center text-[#8a8a85] hover:text-gray-700 hover:bg-[#e4e4e0]/60 rounded-lg transition-colors">
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8a8a85] transition-colors hover:bg-[#f5f2ec] hover:text-[#2a241c]">
             <MoreHorizontal size={15} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 bg-white border-[#e4e4e0]">
+          <DropdownMenuContent align="end" className="w-40 border-[#e4e4e0] bg-white">
             <DropdownMenuItem onClick={() => setIsRenaming(true)} className="text-xs">
               Rename Column
             </DropdownMenuItem>
@@ -124,7 +124,7 @@ export default function Column({ statusId, statusName, statusColor, tasks, onDel
         </DropdownMenu>
       </div>
 
-      <Separator className="my-3 bg-[#e4e4e0]" />
+      <Separator className="my-3 bg-[#efe8dc]" />
 
       {/* Droppable area */}
       <Droppable droppableId={statusId}>
@@ -133,12 +133,12 @@ export default function Column({ statusId, statusName, statusColor, tasks, onDel
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex-1 overflow-y-auto min-h-[80px] -mx-1 px-1 rounded-lg transition-colors duration-150
-              ${snapshot.isDraggingOver ? 'bg-blue-50 ring-1 ring-blue-200' : ''}
+              -mx-1 min-h-[80px] flex-1 overflow-y-auto rounded-[14px] px-1 transition-colors duration-150
+              ${snapshot.isDraggingOver ? 'bg-[#f4f7ff] ring-1 ring-blue-200' : ''}
             `}
           >
             {tasks.length === 0 && !snapshot.isDraggingOver && (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-10">
                 <p className="text-xs text-[#8a8a85]">No tasks yet</p>
               </div>
             )}

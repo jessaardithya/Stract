@@ -5,7 +5,6 @@
   import { usePathname, useRouter } from "next/navigation";
   import { supabase } from "@/lib/supabase";
   import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-  import { Badge } from "@/components/ui/badge";
   import { Input } from "@/components/ui/input";
   import { Button } from "@/components/ui/button";
   import {
@@ -46,6 +45,7 @@
     Trash2,
     ChevronLeft,
     ChevronRight,
+    CalendarDays,
   } from "lucide-react";
   import { useApp } from "@/context/AppContext";
   import {
@@ -390,54 +390,58 @@
     return (
       <>
         <aside
-          className={`sticky top-0 h-screen z-40 bg-white border-r border-[#e4e4e0] flex flex-col shrink-0 transition-all duration-300 relative ${
-            isCollapsed ? "w-[68px]" : "w-[220px]"
+          className={`sticky top-0 h-screen z-40 border-r border-[#e7e1d8] bg-[#fbfaf6] flex flex-col shrink-0 transition-all duration-300 relative ${
+            isCollapsed ? "w-[72px]" : "w-[248px]"
           }`}
         >
-          {/* Collapse Toggle */}
+          <div className="absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,rgba(99,102,241,0.07),rgba(99,102,241,0))] pointer-events-none" />
+
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -right-3 top-6 h-6 w-6 rounded-full border border-[#e4e4e0] bg-white flex items-center justify-center text-gray-400 hover:text-gray-900 shadow-sm z-50 transition-colors"
+            className="absolute -right-px top-6 h-8 w-7 border border-[#e7e1d8] border-r-0 bg-[#fbfaf6] flex items-center justify-center text-[#8a8a85] hover:text-gray-900 z-50 transition-colors"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
 
           {/* Workspace Switcher */}
-          <div className="h-14 flex items-center border-b border-[#e4e4e0] w-full group/wsheader">
+          <div className="relative border-b border-[#e7e1d8] group/wsheader">
             <Popover open={wsOpen} onOpenChange={setWsOpen}>
+              <div className="flex items-stretch">
               <PopoverTrigger
-                className={`flex flex-1 items-center h-full hover:bg-[#f4f4f2] transition-all duration-300 text-left outline-none cursor-pointer ${
-                  isCollapsed ? "justify-center" : "gap-2.5 pl-4 pr-1"
+                className={`flex flex-1 items-center text-left outline-none cursor-pointer transition-colors hover:bg-white/60 ${
+                  isCollapsed ? "justify-center px-0 h-[76px]" : "gap-3 px-4 py-4"
                 }`}
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
-                  <span className="text-white text-xs font-bold">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center border border-black/[0.07] bg-gradient-to-br from-violet-500 via-violet-500 to-blue-500 text-white shadow-[0_6px_18px_rgba(79,70,229,0.18)]">
+                  <span className="text-sm font-semibold">
                     {activeWorkspace?.name?.[0]?.toUpperCase() ?? "S"}
                   </span>
                 </div>
                 {!isCollapsed && (
-                  <>
-                    <span className="text-[14px] font-semibold text-gray-900 truncate flex-1">
+                  <div className="min-w-0 flex flex-1 items-center gap-2">
+                    <span className="text-[15px] font-semibold text-gray-950 truncate flex-1">
                       {activeWorkspace?.name ?? "Loading…"}
                     </span>
                     <ChevronsUpDown
                       size={13}
                       className="text-[#8a8a85] shrink-0"
                     />
-                  </>
+                  </div>
                 )}
               </PopoverTrigger>
               {!isCollapsed && (
                 <button
                   onClick={openWsSettings}
-                  className="px-3 h-full flex items-center justify-center text-[#8a8a85] opacity-0 group-hover/wsheader:opacity-100 hover:text-gray-900 transition-all outline-none"
+                  className="px-4 text-[#8a8a85] opacity-0 group-hover/wsheader:opacity-100 hover:text-gray-900 transition-all outline-none"
                   title="Workspace Settings"
                 >
                   <Settings size={14} />
                 </button>
               )}
+              </div>
               <PopoverContent
-                className="w-[200px] p-1.5"
+                className="w-[220px] border-[#e7e1d8] bg-[#fffdf8] p-1.5 shadow-[0_18px_40px_rgba(26,26,26,0.08)]"
                 align="start"
                 side="bottom"
               >
@@ -451,27 +455,27 @@
                       setActiveWorkspace(ws);
                       setWsOpen(false);
                     }}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                    className={`w-full flex items-center gap-2 px-2 py-2 text-sm transition-colors ${
                       ws.id === activeWorkspace?.id
-                        ? "bg-violet-50 text-violet-700 font-medium"
-                        : "text-gray-700 hover:bg-[#f4f4f2]"
+                        ? "bg-[#f4f1ea] text-gray-950 font-medium"
+                        : "text-gray-700 hover:bg-[#f7f4ee]"
                     }`}
                   >
-                    <Building2 size={13} />
+                    <Building2 size={13} className="shrink-0 text-[#8a8a85]" />
                     <span className="truncate">{ws.name}</span>
                     {ws.id === activeWorkspace?.id && (
-                      <Check size={12} className="ml-auto shrink-0" />
+                      <Check size={12} className="ml-auto shrink-0 text-violet-600" />
                     )}
                   </button>
                 ))}
                 {/* New workspace */}
-                <div className="border-t border-[#e4e4e0] mt-1 pt-1">
+                <div className="border-t border-[#e7e1d8] mt-1 pt-1">
                   <button
                     onClick={() => {
                       setWsOpen(false);
                       setWsDialogOpen(true);
                     }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[#8a8a85] hover:bg-[#f4f4f2] hover:text-gray-700 transition-colors"
+                    className="w-full flex items-center gap-2 px-2 py-2 text-sm text-[#5d5a54] hover:bg-[#f7f4ee] hover:text-gray-900 transition-colors"
                   >
                     <Plus size={13} />
                     New Workspace
@@ -483,7 +487,7 @@
                       localStorage.removeItem("activeProjectId");
                       router.push("/login");
                     }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"
+                    className="w-full flex items-center gap-2 px-2 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"
                   >
                     <LogOut size={13} />
                     Sign out
@@ -493,35 +497,43 @@
             </Popover>
           </div>
 
-          {/* Project List */}
-          <nav className="flex-1 overflow-y-auto py-3 px-2">
+          <nav className={`flex-1 overflow-y-auto ${isCollapsed ? "px-2 py-4" : "px-3 py-4"}`}>
             {!isCollapsed ? (
-              <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-widest px-3 mb-1.5 transition-all">
-                Projects
-              </p>
+              <div className="mb-2 flex items-center justify-between px-1">
+                <p className="text-[10px] font-semibold text-[#8a8a85] uppercase tracking-[0.22em] transition-all">
+                  Projects
+                </p>
+                <span className="text-[11px] text-[#8a8a85]">{projects.length}</span>
+              </div>
             ) : (
-              <div className="h-4" />
+              <div className="mb-2 h-4" />
             )}
 
+            <div className="space-y-1">
             {projects.map((p) => {
               const isActive = activeProject?.id === p.id;
               const count = totalTaskCount(p);
               return (
-                <div key={p.id} className="mb-0.5">
+                <div key={p.id}>
                   <button
                     onClick={() => {
                       setActiveProject(p);
                       router.push("/");
                     }}
-                    className={`flex items-center transition-all duration-100 text-left ${
+                    className={`group relative flex items-center text-left transition-colors ${
                       isCollapsed
-                        ? "w-10 h-10 justify-center mx-auto rounded-xl p-0 mb-1"
-                        : "w-full gap-2.5 px-3 py-2 rounded-lg"
+                        ? "mx-auto h-11 w-11 justify-center"
+                        : "min-h-[42px] w-full gap-3 px-3 py-2"
                     } text-sm font-medium ${
                       isActive
-                        ? "text-gray-900 bg-[#f4f4f2]"
-                        : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
+                        ? "text-gray-950 bg-white/75"
+                        : "text-[#4f4a43] hover:bg-white/55 hover:text-gray-950"
                     }`}
+                    style={
+                      isActive
+                        ? { boxShadow: `inset 2px 0 0 ${p.color}` }
+                        : undefined
+                    }
                     title={isCollapsed ? p.name : undefined}
                   >
                     <span
@@ -530,14 +542,18 @@
                     />
                     {!isCollapsed && (
                       <>
-                        <span className="flex-1 truncate">{p.name}</span>
-                        {!isActive && count > 0 && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] h-4 px-1.5 font-medium"
-                          >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium">{p.name}</p>
+                          {isActive && (
+                            <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#8a8a85]">
+                              Active project
+                            </p>
+                          )}
+                        </div>
+                        {count > 0 && (
+                          <span className="shrink-0 text-[11px] font-medium text-[#8a8a85]">
                             {count}
-                          </Badge>
+                          </span>
                         )}
                       </>
                     )}
@@ -545,46 +561,77 @@
                   {/* Accordion Expanded State */}
                   {isActive && !isCollapsed && (
                     <div
-                      className="pl-6 pr-2 py-1 flex flex-col gap-0.5 border-l-2 ml-4 mt-0.5 mb-2"
-                      style={{ borderColor: `${p.color}40` }}
+                      className="ml-5 mt-1 mb-3 flex flex-col gap-0.5 border-l pl-4"
+                      style={{ borderColor: `${p.color}30` }}
                     >
                       <button
                         onClick={() => router.push("/")}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
                           pathname === "/"
-                            ? "bg-white shadow-sm border border-[#e4e4e0] font-medium text-gray-900"
-                            : "text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2]"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
                         }`}
                       >
+                        {pathname === "/" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
                         <LayoutDashboard
                           size={13}
-                          className={pathname === "/" ? `text-[${p.color}]` : ""}
-                          style={pathname === "/" ? { color: p.color } : {}}
+                          className="shrink-0"
+                          style={pathname === "/" ? { color: p.color } : undefined}
                         />
                         Kanban Board
                       </button>
                       <button
                         onClick={() => router.push("/list")}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
                           pathname === "/list"
-                            ? "bg-white shadow-sm border border-[#e4e4e0] font-medium text-gray-900"
-                            : "text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2]"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
                         }`}
                       >
+                        {pathname === "/list" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
                         <LayoutList
                           size={13}
-                          className={
-                            pathname === "/list" ? `text-[${p.color}]` : ""
-                          }
-                          style={pathname === "/list" ? { color: p.color } : {}}
+                          className="shrink-0"
+                          style={pathname === "/list" ? { color: p.color } : undefined}
                         />
                         List View
                       </button>
                       <button
-                        onClick={openProjectSettings}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2] transition-colors"
+                        onClick={() => router.push("/timeline")}
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
+                          pathname === "/timeline"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
+                        }`}
                       >
-                        <Settings size={13} />
+                        {pathname === "/timeline" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
+                        <CalendarDays
+                          size={13}
+                          className="shrink-0"
+                          style={pathname === "/timeline" ? { color: p.color } : undefined}
+                        />
+                        Timeline
+                      </button>
+                      <button
+                        onClick={openProjectSettings}
+                        className="w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] text-[#8a8a85] hover:text-gray-950 transition-colors"
+                      >
+                        <Settings size={13} className="shrink-0" />
                         Project Settings
                       </button>
                     </div>
@@ -592,10 +639,12 @@
                 </div>
               );
             })}
+            </div>
 
             {/* Inline new project */}
             {showNewProject && !isCollapsed ? (
-              <div className="px-2 mt-1">
+              <div className="mt-3 border-t border-[#e7e1d8] pt-3">
+                <div className="space-y-2 px-1">
                 <Input
                   autoFocus
                   value={newProjectName}
@@ -603,7 +652,7 @@
                   onKeyDown={handleNewProjectKeyDown}
                   placeholder="Project name…"
                   disabled={isCreating}
-                  className="h-7 text-xs mb-1.5 border-[#e4e4e0] focus-visible:ring-violet-300"
+                  className="h-8 border-[#ddd7cd] bg-white/85 text-[12px] shadow-none focus-visible:ring-violet-300"
                 />
                 <Input
                   value={newProjectDescription}
@@ -611,15 +660,15 @@
                   onKeyDown={handleNewProjectKeyDown}
                   placeholder="Project description (optional)"
                   disabled={isCreating}
-                  className="h-7 text-xs mb-2 border-[#e4e4e0] focus-visible:ring-violet-300"
+                  className="h-8 border-[#ddd7cd] bg-white/85 text-[12px] shadow-none focus-visible:ring-violet-300"
                 />
                 {/* Color swatches */}
-                <div className="flex items-center gap-1 mb-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {PRESET_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setNewProjectColor(color)}
-                      className="w-5 h-5 rounded-full transition-transform hover:scale-110 relative"
+                      className="relative h-5 w-5 rounded-full transition-transform hover:scale-110"
                       style={{ backgroundColor: color }}
                     >
                       {newProjectColor === color && (
@@ -631,12 +680,12 @@
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <Button
                     size="sm"
                     onClick={handleCreateProject}
                     disabled={isCreating || !newProjectName.trim()}
-                    className="h-6 text-[11px] px-2 bg-[#1a1a1a] hover:bg-[#333] text-white"
+                    className="h-7 bg-[#1a1a1a] px-2.5 text-[11px] text-white hover:bg-[#333]"
                   >
                     {isCreating ? (
                       <Loader2 size={10} className="animate-spin" />
@@ -652,18 +701,20 @@
                       onClick={() => {
                         setShowNewProject(false);
                         setNewProjectName("");
+                        setNewProjectDescription("");
                       }}
-                      className="h-6 text-[11px] px-2 text-[#8a8a85]"
+                      className="h-7 px-2 text-[11px] text-[#8a8a85]"
                     >
                       <X size={10} />
                     </Button>
                   )}
                 </div>
                 {projects.length === 0 && (
-                  <p className="text-xs text-gray-400 mt-3">
-                    You can always add more projects later.
+                  <p className="pt-1 text-[11px] text-[#8a8a85]">
+                    Start with one project. You can add more later.
                   </p>
                 )}
+                </div>
               </div>
             ) : (
               <button
@@ -671,20 +722,24 @@
                   if (isCollapsed) setIsCollapsed(false);
                   setShowNewProject(true);
                 }}
-                className={`flex items-center transition-all text-[#8a8a85] hover:text-gray-900 hover:bg-[#f4f4f2] rounded-lg mt-0.5 ${
+                className={`mt-3 flex items-center text-[#5d5a54] transition-colors hover:bg-white/55 hover:text-gray-950 ${
                   isCollapsed
-                    ? "w-10 h-10 justify-center mx-auto rounded-xl p-0"
-                    : "w-full gap-2 px-3 py-1.5 text-[12px]"
+                    ? "mx-auto h-11 w-11 justify-center"
+                    : "w-full gap-2 px-3 py-2 text-[12px]"
                 }`}
                 title={isCollapsed ? "New Project" : undefined}
               >
-                <Plus size={12} className="shrink-0" />
-                {!isCollapsed && "New Project"}
+                <Plus size={13} className="shrink-0" />
+                {!isCollapsed && <span className="font-medium">New Project</span>}
               </button>
             )}
 
-            {/* Bottom nav */}
-            <div className="mt-4 border-t border-[#e4e4e0] pt-3">
+            <div className="mt-5 border-t border-[#e7e1d8] pt-4">
+              {!isCollapsed && (
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8a8a85]">
+                  Workspace
+                </p>
+              )}
               {BOTTOM_NAV.map(({ href, label, Icon }) => {
                 const active = pathname === href;
                 return (
@@ -692,16 +747,19 @@
                     key={href}
                     href={href}
                     title={isCollapsed ? label : undefined}
-                    className={`flex items-center transition-all rounded-lg mb-0.5 text-sm font-medium ${
+                    className={`relative mb-1 flex items-center transition-colors ${
                       isCollapsed
-                        ? "w-10 h-10 justify-center mx-auto p-0 rounded-xl"
-                        : "w-full gap-3 px-3 py-2"
+                        ? "mx-auto h-11 w-11 justify-center"
+                        : "w-full gap-3 px-3 py-2 text-sm"
                     } ${
                       active
-                        ? "bg-violet-50 text-violet-700"
-                        : "text-[#4a4a45] hover:bg-[#f4f4f2] hover:text-gray-900"
+                        ? "bg-white/75 text-gray-950"
+                        : "text-[#4f4a43] hover:bg-white/55 hover:text-gray-950"
                     }`}
                   >
+                    {active && !isCollapsed && (
+                      <span className="absolute left-0 top-0 h-full w-[2px] bg-violet-500" />
+                    )}
                     <Icon
                       size={15}
                       className={
@@ -710,35 +768,43 @@
                           : "text-[#8a8a85] shrink-0"
                       }
                     />
-                    {!isCollapsed && label}
+                    {!isCollapsed && <span className="font-medium">{label}</span>}
                   </Link>
                 );
               })}
             </div>
           </nav>
 
-          {/* User */}
           <div
-            className={`py-4 border-t border-[#e4e4e0] flex items-center transition-all ${
-              isCollapsed ? "justify-center px-0" : "gap-3 px-4"
+            className={`border-t border-[#e7e1d8] py-3.5 ${
+              isCollapsed ? "px-0" : "px-4"
             }`}
           >
-            <Avatar
-              className="h-7 w-7 shrink-0 cursor-pointer"
-              title={isCollapsed ? "Jessa" : undefined}
+            <div
+              className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"}`}
             >
-              <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
-                J
-              </AvatarFallback>
-            </Avatar>
-            {!isCollapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate leading-tight">
-                  Jessa
-                </p>
-                <p className="text-[11px] text-[#8a8a85] truncate">Free plan</p>
-              </div>
-            )}
+              <Avatar
+                className="h-8 w-8 shrink-0 cursor-pointer border border-black/[0.05]"
+                title={isCollapsed ? "Jessa" : undefined}
+              >
+                <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
+                  J
+                </AvatarFallback>
+              </Avatar>
+              {!isCollapsed && (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-950 truncate leading-tight">
+                      Jessa
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[#8a8a85] truncate">
+                      Free plan
+                    </p>
+                  </div>
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                </>
+              )}
+            </div>
           </div>
         </aside>
 
@@ -1390,4 +1456,3 @@
       </>
     );
   }
-

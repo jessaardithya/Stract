@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useReducer, useEffect, useCallback, useRef } from "react";
-import { Plus } from "lucide-react";
+import { CalendarDays, Columns3, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
@@ -230,39 +230,66 @@ export default function Board() {
   );
 
   const { statuses, loading: statusesLoading, refreshStatuses } = useStatuses();
+  const scheduledCount = state.tasks.filter((task) => task.start_date || task.due_date).length;
 
   // Show skeleton while booting or loading without data
   if ((state.loading || statusesLoading) && state.tasks.length === 0) {
     return (
-      <div className="flex gap-5 max-w-6xl mx-auto px-6 pb-8">
-        {(statuses.length > 0 ? statuses : [1, 2, 3]).map((s, idx) => (
-          <div
-            key={typeof s === 'number' ? idx : s.id}
-            className="flex flex-col w-[300px] min-w-[300px] rounded-xl bg-[#f4f4f2] border border-[#e4e4e0] p-4 h-60 animate-pulse"
-          />
-        ))}
+      <div className="space-y-4">
+        <div className="h-32 animate-pulse rounded-[18px] border border-[#e7e2d8] bg-[#fbfaf7]" />
+        <div className="flex gap-4 overflow-hidden">
+          {(statuses.length > 0 ? statuses : [1, 2, 3]).map((s, idx) => (
+            <div
+              key={typeof s === "number" ? idx : s.id}
+              className="h-72 w-[320px] min-w-[320px] animate-pulse rounded-[20px] border border-[#e7e2d8] bg-[#fbfaf7]"
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Active project header */}
+    <div className="space-y-4">
       {activeProject && (
-        <div className="max-w-6xl mx-auto px-6 pt-1 pb-2 flex items-center gap-2">
-          <span
-            className="w-2.5 h-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: activeProject.color }}
-          />
-          <span className="text-sm font-medium text-[#4a4a45]">
-            {activeProject.name}
-          </span>
-        </div>
+        <section className="flex flex-col gap-3 rounded-[18px] border border-[#e7e2d8] bg-[#fbfaf7] px-5 py-5 shadow-[0_18px_40px_-32px_rgba(28,24,17,0.22)] md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f877a]">
+              Board
+            </p>
+            <div className="mt-1.5 flex items-center gap-3">
+              <span
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: activeProject.color }}
+              />
+              <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-[#1f1b17]">
+                {activeProject.name}
+              </h1>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#746d62]">
+              {activeProject.description?.trim() ||
+                "Manage tasks across custom stages, keep work moving, and add structure without losing momentum."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
+              <Columns3 className="h-3.5 w-3.5" />
+              {statuses.length} column{statuses.length === 1 ? "" : "s"}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {scheduledCount} scheduled
+            </span>
+            <span className="rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
+              {state.tasks.length} total task{state.tasks.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        </section>
       )}
 
       {state.error && (
-        <div className="max-w-6xl mx-auto px-6 mb-4">
-          <div className="flex items-center justify-between bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2.5">
+        <div>
+          <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
             <span>{state.error}</span>
             <button
               onClick={() => dispatch({ type: "CLEAR_ERROR" })}
@@ -275,42 +302,45 @@ export default function Board() {
       )}
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-5 max-w-6xl mx-auto px-6 pb-8 overflow-x-auto items-start">
-          {statuses.map((status) => (
-            <Column
-              key={status.id}
-              statusId={status.id}
-              statusName={status.name}
-              statusColor={status.color}
-              tasks={getColumnTasks(status.id)}
-              onDelete={handleDelete}
-              onRename={handleRename}
-              onTaskAdded={handleTaskAdded}
-              onError={handleError}
-              activeWorkspace={activeWorkspace!}
-              activeProject={activeProject!}
-              onStatusUpdate={refreshStatuses}
-            />
-          ))}
+        <section className="rounded-[20px] border border-[#e7e2d8] bg-[#fbfaf7] p-3 shadow-[0_18px_40px_-32px_rgba(28,24,17,0.22)]">
+          <div className="overflow-x-auto pb-2">
+            <div className="flex min-w-max items-start gap-4">
+              {statuses.map((status) => (
+                <Column
+                  key={status.id}
+                  statusId={status.id}
+                  statusName={status.name}
+                  statusColor={status.color}
+                  tasks={getColumnTasks(status.id)}
+                  onDelete={handleDelete}
+                  onRename={handleRename}
+                  onTaskAdded={handleTaskAdded}
+                  onError={handleError}
+                  activeWorkspace={activeWorkspace!}
+                  activeProject={activeProject!}
+                  onStatusUpdate={refreshStatuses}
+                />
+              ))}
 
-          {/* Add Column Button */}
-          <AddColumnButton
-            onAdd={async (name) => {
-              if (!activeWorkspace?.id || !activeProject?.id) return;
-              try {
-                await createStatus(activeWorkspace.id, activeProject.id, {
-                  name,
-                  color: "#9ca3af",
-                  position: statuses.length * 65536,
-                });
-                refreshStatuses();
-              } catch (err) {
-                const message = err instanceof Error ? err.message : 'Unknown error';
-                handleError(message);
-              }
-            }}
-          />
-        </div>
+              <AddColumnButton
+                onAdd={async (name) => {
+                  if (!activeWorkspace?.id || !activeProject?.id) return;
+                  try {
+                    await createStatus(activeWorkspace.id, activeProject.id, {
+                      name,
+                      color: "#9ca3af",
+                      position: statuses.length * 65536,
+                    });
+                    refreshStatuses();
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : "Unknown error";
+                    handleError(message);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </section>
       </DragDropContext>
     </div>
   );
@@ -324,7 +354,7 @@ function AddColumnButton({ onAdd }: { onAdd: (name: string) => void }) {
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="flex flex-col items-center justify-center w-[300px] min-w-[300px] h-[120px] rounded-xl border-2 border-dashed border-[#e4e4e0] hover:border-[#9ca3af] hover:bg-[#f4f4f2]/50 text-[#8a8a85] hover:text-gray-600 transition-all duration-150 group"
+        className="flex h-[122px] w-[320px] min-w-[320px] flex-col items-center justify-center rounded-[20px] border border-dashed border-[#d8d1c5] bg-white/70 text-[#8a8a85] transition-all duration-150 group hover:border-[#b7aea1] hover:bg-white"
       >
         <Plus
           size={20}
@@ -336,7 +366,7 @@ function AddColumnButton({ onAdd }: { onAdd: (name: string) => void }) {
   }
 
   return (
-    <div className="w-[300px] min-w-[300px] bg-white border border-[#e4e4e0] rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="w-[320px] min-w-[320px] animate-in slide-in-from-top-2 fade-in rounded-[20px] border border-[#e7e2d8] bg-white p-4 shadow-[0_18px_40px_-32px_rgba(28,24,17,0.22)] duration-200">
       <Input
         autoFocus
         placeholder="Column name..."

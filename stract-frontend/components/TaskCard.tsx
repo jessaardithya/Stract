@@ -93,13 +93,13 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
           <Card 
             onClick={() => { if (!isEditing) openTask(task.id); }}
             className={`
-              group bg-white border border-[#e4e4e0] rounded-lg shadow-sm p-0
+              group rounded-[16px] border border-[#e7e2d8] bg-[#fcfbf8] p-0
               cursor-pointer active:cursor-grabbing transition-all duration-150
               ${snapshot.isDragging
-                ? 'shadow-xl border-[#c9c9c4] rotate-1 opacity-90 scale-[1.02]'
-                : 'hover:shadow-md hover:border-[#c9c9c4]'}
+                ? 'scale-[1.02] rotate-1 border-[#c9c1b4] shadow-xl opacity-90'
+                : 'hover:border-[#c9c1b4] hover:bg-white hover:shadow-[0_14px_30px_-24px_rgba(28,24,17,0.32)]'}
             `}>
-            <CardContent className="p-3">
+            <CardContent className="p-3.5">
               {/* Title row with priority dot */}
               <div className="flex items-start justify-between gap-2">
                 {isEditing ? (
@@ -110,7 +110,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                       onChange={(e) => setEditTitle(e.target.value)}
                       onKeyDown={handleKeyDown}
                       disabled={isSaving}
-                      className="h-7 text-sm font-medium py-0 px-1.5 border-[#e4e4e0] focus-visible:ring-violet-300"
+                      className="h-7 border-[#e6dfd2] px-1.5 py-0 text-sm font-medium focus-visible:ring-violet-300"
                       onClick={(e) => e.stopPropagation()}
                     />
                     <textarea
@@ -121,7 +121,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                       disabled={isSaving}
                       placeholder="Add description..."
                       rows={2}
-                      className="w-full resize-none text-xs rounded-md border border-[#e4e4e0] bg-white px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 disabled:opacity-50"
+                      className="w-full resize-none rounded-md border border-[#e6dfd2] bg-white px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 disabled:opacity-50"
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
@@ -136,7 +136,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                       </Tooltip>
                       <p
                         onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                        className="text-sm font-medium text-gray-800 leading-snug flex-1 min-w-0 cursor-text truncate"
+                        className="min-w-0 flex-1 cursor-text truncate text-sm font-semibold leading-snug text-[#1f1b17]"
                       >
                         {task.title}
                       </p>
@@ -144,7 +144,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                     {task.description && (
                       <p
                         onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                        className="text-xs text-[#8a8a85] line-clamp-2 leading-relaxed pl-3 cursor-text"
+                        className="line-clamp-2 cursor-text pl-3 text-xs leading-relaxed text-[#7c7367]"
                       >
                         {task.description}
                       </p>
@@ -157,7 +157,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                     <Tooltip>
                       <TooltipTrigger
                         onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                        className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#8a8a85] transition-colors hover:bg-violet-50 hover:text-violet-500"
                       >
                         <Pencil size={12} />
                       </TooltipTrigger>
@@ -166,7 +166,7 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                     <Tooltip>
                       <TooltipTrigger
                         onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-                        className="inline-flex items-center justify-center rounded-lg h-6 w-6 text-[#8a8a85] hover:text-red-500 hover:bg-red-50 transition-colors"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#8a8a85] transition-colors hover:bg-red-50 hover:text-red-500"
                       >
                         <Trash2 size={12} />
                       </TooltipTrigger>
@@ -194,8 +194,8 @@ export default function TaskCard({ task, index, onDelete, onRename }: TaskCardPr
                     
                     {task.due_date && (
                       <div className={`flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-sm border ${
-                        dueDateStatus(task.due_date) === 'overdue' ? 'border-red-200 text-red-600 bg-red-50' : 
-                        dueDateStatus(task.due_date) === 'today' ? 'border-amber-200 text-amber-600 bg-amber-50' : 'border-transparent text-[#8a8a85]'
+                        dueDateStatus(task.due_date) === 'overdue' ? 'border-red-200 bg-red-50 text-red-600' : 
+                        dueDateStatus(task.due_date) === 'today' ? 'border-amber-200 bg-amber-50 text-amber-600' : 'border-transparent text-[#8a8a85]'
                       }`}>
                          {dueDateStatus(task.due_date) === 'overdue' ? <AlertTriangle size={10} /> : <Calendar size={10} />}
                          <span>{formatDate(task.due_date)}</span>
