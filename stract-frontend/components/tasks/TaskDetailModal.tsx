@@ -54,8 +54,11 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Check,
+  Check as CheckIcon,
   X,
   ChevronRight,
+  ChevronDown,
+  ChevronDown as ChevronDownIcon,
   MessageSquare,
   ListTodo,
   Trash2,
@@ -708,13 +711,11 @@ export default function TaskDetailModal() {
               <div className="space-y-5">
                 {/* Status */}
                 <PropItem label="Status">
-                  <Select
-                    value={task?.status_id || ""}
-                    onValueChange={(v) => patchTask({ status_id: v })}
-                  >
-                    <SelectTrigger
-                      className="h-8 text-[12.5px] font-medium bg-white border-black/10
-                                            hover:border-violet-300 rounded-lg shadow-none transition-colors"
+                  <Popover>
+                    <PopoverTrigger
+                      className="flex h-8 w-full items-center justify-between px-3
+                                             text-[12.5px] font-medium bg-white border border-black/10
+                                             rounded-lg hover:border-violet-300 transition-colors group shadow-none"
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span
@@ -723,32 +724,47 @@ export default function TaskDetailModal() {
                         />
                         <span className="truncate">{task?.status?.name}</span>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statuses.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: s.color }}
-                            />
-                            {s.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <ChevronDownIcon size={14} className="text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup>
+                            {statuses.map((s) => (
+                              <CommandItem
+                                key={s.id}
+                                value={s.id}
+                                onSelect={() => {
+                                  patchTask({ status_id: s.id });
+                                }}
+                                className="text-xs py-2 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full"
+                                    style={{ background: s.color }}
+                                  />
+                                  {s.name}
+                                </div>
+                                {task?.status_id === s.id && (
+                                  <CheckIcon className="ml-auto h-3 w-3 opacity-60" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </PropItem>
 
                 {/* Priority */}
                 <PropItem label="Priority">
-                  <Select
-                    value={task?.priority || ""}
-                    onValueChange={(v) => patchTask({ priority: v as Priority })}
-                  >
-                    <SelectTrigger
-                      className="h-8 text-[12.5px] font-medium bg-white border-black/10
-                                            hover:border-violet-300 rounded-lg shadow-none transition-colors"
+                  <Popover>
+                    <PopoverTrigger
+                      className="flex h-8 w-full items-center justify-between px-3
+                                             text-[12.5px] font-medium bg-white border border-black/10
+                                             rounded-lg hover:border-violet-300 transition-colors group shadow-none"
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span
@@ -759,20 +775,37 @@ export default function TaskDetailModal() {
                           {task?.priority || "None"}
                         </span>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PRIORITY_CFG).map(([val, cfg]) => (
-                        <SelectItem key={val} value={val}>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}
-                            />
-                            {cfg.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <ChevronDownIcon size={14} className="text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup>
+                            {Object.entries(PRIORITY_CFG).map(([val, cfg]) => (
+                              <CommandItem
+                                key={val}
+                                value={val}
+                                onSelect={() => {
+                                  patchTask({ priority: val as Priority });
+                                }}
+                                className="text-xs py-2 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}
+                                  />
+                                  {cfg.label}
+                                </div>
+                                {task?.priority === val && (
+                                  <CheckIcon className="ml-auto h-3 w-3 opacity-60" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </PropItem>
 
                 {/* Assignee */}

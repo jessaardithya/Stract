@@ -46,6 +46,7 @@
     ChevronLeft,
     ChevronRight,
     CalendarDays,
+    CalendarRange,
   } from "lucide-react";
   import { useApp } from "@/context/AppContext";
   import {
@@ -626,6 +627,27 @@
                           style={pathname === "/timeline" ? { color: p.color } : undefined}
                         />
                         Timeline
+                      </button>
+                      <button
+                        onClick={() => router.push("/calendar")}
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
+                          pathname === "/calendar"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
+                        }`}
+                      >
+                        {pathname === "/calendar" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
+                        <CalendarRange
+                          size={13}
+                          className="shrink-0"
+                          style={pathname === "/calendar" ? { color: p.color } : undefined}
+                        />
+                        Calendar
                       </button>
                       <button
                         onClick={openProjectSettings}

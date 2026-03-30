@@ -4,11 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addDays,
   addMonths,
+  addQuarters,
+  addWeeks,
   differenceInCalendarDays,
+  endOfQuarter,
+  endOfWeek,
   format,
+  isSameMonth,
   parseISO,
   startOfDay,
+  startOfQuarter,
+  startOfWeek,
   subMonths,
+  subQuarters,
+  subWeeks,
 } from "date-fns";
 import {
   CalendarRange,
@@ -178,10 +187,21 @@ export default function TimelineView() {
 
   const layout = useTimelineLayout(scheduledTasks, zoom, viewDate);
   const totalTimelineTasks = scheduledTasks.length + unscheduledTasks.length;
-  const toolbarTitle =
-    zoom === "quarter"
-      ? `${format(viewDate, "MMMM yyyy")} - ${format(addMonths(viewDate, 2), "MMMM yyyy")}`
-      : format(viewDate, "MMMM yyyy");
+  const toolbarTitle = (() => {
+    if (zoom === "week") {
+      const start = startOfWeek(viewDate, { weekStartsOn: 0 });
+      const end = endOfWeek(viewDate, { weekStartsOn: 0 });
+      return isSameMonth(start, end)
+        ? `${format(start, "MMM d")} – ${format(end, "d, yyyy")}`
+        : `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`;
+    }
+    if (zoom === "quarter") {
+      const quarterStart = startOfQuarter(viewDate);
+      const quarterEnd = endOfQuarter(viewDate);
+      return `${format(quarterStart, "MMM")} – ${format(quarterEnd, "MMM yyyy")}`;
+    }
+    return format(viewDate, "MMMM yyyy");
+  })();
 
   const syncTaskFromServer = useCallback(
     async (taskId: string) => {
@@ -404,11 +424,19 @@ export default function TimelineView() {
   };
 
   const goBack = () => {
-    setViewDate((current) => subMonths(current, zoom === "quarter" ? 3 : 1));
+    setViewDate((current) => {
+      if (zoom === "week") return subWeeks(current, 1);
+      if (zoom === "quarter") return subQuarters(current, 1);
+      return subMonths(current, 1);
+    });
   };
 
   const goForward = () => {
-    setViewDate((current) => addMonths(current, zoom === "quarter" ? 3 : 1));
+    setViewDate((current) => {
+      if (zoom === "week") return addWeeks(current, 1);
+      if (zoom === "quarter") return addQuarters(current, 1);
+      return addMonths(current, 1);
+    });
   };
 
   const goToday = () => {

@@ -413,21 +413,40 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 	}
 	newPos := (req.PrevPos + nextPos) / 2.0
 
-	cmdTag, err := h.DB.Exec(context.Background(),
-		`UPDATE stract.tasks SET position = $1, status_id = $2, status = $3, last_moved_at = NOW(), updated_at = NOW()
-		 WHERE id = $4`,
+	var t Task
+	var aID, aEmail, aName, aAvatar *string
+	row := h.DB.QueryRow(context.Background(),
+		`WITH upd AS (
+		  UPDATE stract.tasks
+		  SET position = $1, status_id = $2, status = $3, last_moved_at = NOW(), updated_at = NOW()
+		  WHERE id = $4
+		  RETURNING *
+		)
+		`+fullTaskSelect+` FROM upd t
+		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
 		newPos, req.StatusID, progressStatus, id,
 	)
-	if err != nil || cmdTag.RowsAffected() == 0 {
+	if err := row.Scan(
+		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
+		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
+		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
+		&aID, &aEmail, &aName, &aAvatar,
+		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
+	); err != nil {
+		log.Printf("[ws-tasks] position update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task position"})
 		return
+	}
+	if aID != nil && aEmail != nil {
+		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	var newStatusName string
 	err = h.DB.QueryRow(context.Background(), "SELECT name FROM stract.project_statuses WHERE id = $1", req.StatusID).Scan(&newStatusName)
 	if err != nil {
 		log.Printf("[ws-tasks] failed to fetch new status name for event: %v", err)
-		newStatusName = "Unknown"
+		newStatusName = t.Status.Name
 	}
 
 	events.Emit(events.TaskEvent{
@@ -442,7 +461,7 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 
 	activity.LogActivity(h.DB, id, userID.(string), "moved the task", oldStatusName, newStatusName)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Task position updated successfully", "position": newPos})
+	c.JSON(http.StatusOK, gin.H{"data": t})
 }
 
 // WorkspaceDeleteTask handles DELETE /api/v1/workspaces/:workspace_id/tasks/:id

@@ -70,7 +70,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		     FROM (
 		       WITH ordered_statuses AS (
 		         SELECT
-		           id,
+		           id, name,
 		           ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
 		           COUNT(*) OVER () AS total_count
 		         FROM stract.project_statuses
@@ -80,6 +80,8 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		         SELECT
 		           id,
 		           CASE
+		             WHEN LOWER(name) = 'done' THEN 'done'
+		             WHEN LOWER(name) = 'todo' OR LOWER(name) = 'to do' THEN 'todo'
 		             WHEN row_num = 1 THEN 'todo'
 		             WHEN row_num = total_count THEN 'done'
 		             ELSE 'in-progress'
@@ -144,8 +146,17 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		return
 	}
 
+	ctx := context.Background()
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("[projects] transaction start error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
 	var p Project
-	err := h.DB.QueryRow(context.Background(),
+	err = tx.QueryRow(ctx,
 		`INSERT INTO stract.projects (workspace_id, creator_id, name, color, description)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, workspace_id, name, COALESCE(description,''), color, creator_id, created_at::text, archived_at::text`,
@@ -154,6 +165,36 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	if err != nil {
 		log.Printf("[projects] create error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create project"})
+		return
+	}
+
+	// Insert default statuses
+	defaultStatuses := []struct {
+		Name     string
+		Color    string
+		Position float64
+	}{
+		{"To Do", "#94a3b8", 65536.0},
+		{"In Progress", "#3b82f6", 131072.0},
+		{"Done", "#10b981", 196608.0},
+	}
+
+	for _, s := range defaultStatuses {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO stract.project_statuses (project_id, name, color, position)
+			 VALUES ($1, $2, $3, $4)`,
+			p.ID, s.Name, s.Color, s.Position,
+		)
+		if err != nil {
+			log.Printf("[projects] create status error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create default statuses"})
+			return
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[projects] commit error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transaction"})
 		return
 	}
 
@@ -197,17 +238,36 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 }
 
 // ArchiveProject handles DELETE /api/v1/workspaces/:workspace_id/projects/:id
-// Soft-deletes by setting archived_at = NOW(). Only the creator can archive.
+// PERMANENTLY deletes project and all related data (tasks, subtasks, activity, statuses).
 func (h *Handler) ArchiveProject(c *gin.Context) {
 	id := c.Param("id")
 	userID, _ := c.Get("user_id")
 
+	ctx := context.Background()
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("[projects] delete transaction start error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start deletion transaction"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Verify project exists and requester is the creator
+	var p Project
+	err = tx.QueryRow(ctx,
+		"SELECT id, workspace_id, name, COALESCE(description,''), color, creator_id, created_at::text, archived_at::text FROM stract.projects WHERE id = $1 AND creator_id = $2",
+		id, userID,
+	).Scan(&p.ID, &p.WorkspaceID, &p.Name, &p.Description, &p.Color, &p.CreatorID, &p.CreatedAt, &p.ArchivedAt)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "project not found or you are not the creator"})
+		return
+	}
+
+	// NEW: Check for active tasks before deletion
 	var activeTasks int
-	countErr := h.DB.QueryRow(context.Background(),
-		"SELECT COUNT(*) FROM stract.tasks WHERE project_id = $1 AND deleted_at IS NULL",
-		id,
-	).Scan(&activeTasks)
-	if countErr != nil {
+	err = tx.QueryRow(ctx, "SELECT COUNT(*) FROM stract.tasks WHERE project_id = $1 AND deleted_at IS NULL", id).Scan(&activeTasks)
+	if err != nil {
+		log.Printf("[projects] check active tasks error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify project contents"})
 		return
 	}
@@ -216,16 +276,49 @@ func (h *Handler) ArchiveProject(c *gin.Context) {
 		return
 	}
 
-	var p Project
-	err := h.DB.QueryRow(context.Background(),
-		`UPDATE stract.projects
-		 SET archived_at = NOW()
-		 WHERE id = $1 AND creator_id = $2
-		 RETURNING id, workspace_id, name, COALESCE(description,''), color, creator_id, created_at::text, archived_at::text`,
-		id, userID,
-	).Scan(&p.ID, &p.WorkspaceID, &p.Name, &p.Description, &p.Color, &p.CreatorID, &p.CreatedAt, &p.ArchivedAt)
+	// 1. Delete subtasks
+	_, err = tx.Exec(ctx, "DELETE FROM stract.subtasks WHERE task_id IN (SELECT id FROM stract.tasks WHERE project_id = $1)", id)
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "project not found or you are not the creator"})
+		log.Printf("[projects] delete subtasks error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete subtasks"})
+		return
+	}
+
+	// 2. Delete task activity
+	_, err = tx.Exec(ctx, "DELETE FROM stract.task_activity WHERE task_id IN (SELECT id FROM stract.tasks WHERE project_id = $1)", id)
+	if err != nil {
+		log.Printf("[projects] delete task activity error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete task activity"})
+		return
+	}
+
+	// 3. Delete tasks
+	_, err = tx.Exec(ctx, "DELETE FROM stract.tasks WHERE project_id = $1", id)
+	if err != nil {
+		log.Printf("[projects] delete tasks error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tasks"})
+		return
+	}
+
+	// 4. Delete statuses
+	_, err = tx.Exec(ctx, "DELETE FROM stract.project_statuses WHERE project_id = $1", id)
+	if err != nil {
+		log.Printf("[projects] delete statuses error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete statuses"})
+		return
+	}
+
+	// 5. Delete project (the project itself)
+	_, err = tx.Exec(ctx, "DELETE FROM stract.projects WHERE id = $1", id)
+	if err != nil {
+		log.Printf("[projects] delete project error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete project record"})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[projects] delete commit error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit deletion"})
 		return
 	}
 

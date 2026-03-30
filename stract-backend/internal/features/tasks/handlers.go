@@ -22,13 +22,15 @@ func (h *Handler) resolveProgressStatus(ctx context.Context, projectID, statusID
 	err := h.DB.QueryRow(ctx,
 		`WITH ordered AS (
 			SELECT
-				id,
+				id, name,
 				ROW_NUMBER() OVER (ORDER BY position ASC, created_at ASC, id ASC) AS row_num,
 				COUNT(*) OVER () AS total_count
 			FROM stract.project_statuses
 			WHERE project_id = $1
 		)
 		SELECT CASE
+			WHEN LOWER(name) = 'done' THEN 'done'
+			WHEN LOWER(name) = 'todo' OR LOWER(name) = 'to do' THEN 'todo'
 			WHEN row_num = 1 THEN 'todo'
 			WHEN row_num = total_count THEN 'done'
 			ELSE 'in-progress'
