@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type {
   ApiResponse, Task, Project, Workspace, WorkspaceMember,
-  ProjectStatus, Subtask, Activity, AnalyticsSummary, Priority
+  ProjectStatus, Subtask, Activity, AnalyticsSummary, PendingInvitation, Priority, UserActivity
 } from '@/types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
@@ -61,6 +61,15 @@ export const updateWorkspace = (workspaceId: string, data: Partial<Pick<Workspac
 
 export const deleteWorkspace = (workspaceId: string): Promise<void> =>
   apiFetch(`/api/v1/workspaces/${workspaceId}`, { method: 'DELETE' });
+
+export const getPendingInvitations = (): Promise<ApiResponse<PendingInvitation[]>> =>
+  apiFetch('/api/v1/invitations/pending');
+
+export const acceptInvitation = (token: string): Promise<ApiResponse<Workspace>> =>
+  apiFetch(`/api/v1/invitations/${token}/accept`, { method: 'POST' });
+
+export const getMyActivity = (): Promise<ApiResponse<UserActivity[]>> =>
+  apiFetch('/api/v1/users/me/activity');
 
 // Projects
 export const getProjects = (workspaceId: string): Promise<ApiResponse<Project[]>> =>

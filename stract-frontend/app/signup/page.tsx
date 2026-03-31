@@ -19,6 +19,7 @@ const friendlyError = (msg: string) => {
 };
 
 export default function Signup() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ export default function Signup() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -50,6 +51,8 @@ export default function Signup() {
 
     if (error) {
       setError(friendlyError(error.message));
+    } else if (data.session) {
+      router.replace('/home');
     } else {
       setSuccess(true);
     }

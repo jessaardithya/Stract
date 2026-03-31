@@ -18,6 +18,7 @@ const friendlyError = (msg: string) => {
 };
 
 export default function Login() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,9 +36,10 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(friendlyError(error.message));
+    } else {
+      router.replace('/home');
     }
     setLoading(false);
-    // Successful login is handled globally by AuthGuard navigating to /
   };
 
   const handleGoogleSignIn = async () => {
@@ -55,7 +57,7 @@ export default function Login() {
       subtitle="Welcome back! Please enter your details."
       footer={
         <>
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/signup" className="font-semibold text-violet-600 hover:text-violet-700 transition-colors">
             Sign up
           </Link>

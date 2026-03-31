@@ -18,14 +18,16 @@ import (
 	"stract-backend/internal/core/middleware"
 	"stract-backend/internal/core/stream"
 	"stract-backend/internal/core/workers"
+	"stract-backend/internal/features/activity"
 	"stract-backend/internal/features/analytics"
-	"stract-backend/internal/features/projects"
-	"stract-backend/internal/features/tasks"
-	"stract-backend/internal/features/workspaces"
+	"stract-backend/internal/features/invitations"
 	"stract-backend/internal/features/members"
+	"stract-backend/internal/features/projects"
 	"stract-backend/internal/features/statuses"
 	"stract-backend/internal/features/subtasks"
-	"stract-backend/internal/features/activity"
+	"stract-backend/internal/features/tasks"
+	"stract-backend/internal/features/users"
+	"stract-backend/internal/features/workspaces"
 )
 
 func main() {
@@ -73,6 +75,8 @@ func main() {
 
 	// Workspace management (no RequireWorkspaceMember — users create their own)
 	workspaces.RegisterRoutes(apiV1, db)
+	invitations.RegisterRoutes(apiV1, db)
+	users.RegisterRoutes(apiV1, db)
 
 	// ── Workspace-member-gated group ──────────────────────────────────────────
 	wsGroup := apiV1.Group("/workspaces/:workspace_id")

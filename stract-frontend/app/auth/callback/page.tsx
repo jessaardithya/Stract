@@ -11,7 +11,7 @@ export default function AuthCallback() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        router.replace('/');
+        router.replace('/home');
       } else {
         router.replace('/login');
       }

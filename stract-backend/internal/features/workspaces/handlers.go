@@ -22,6 +22,8 @@ type Workspace struct {
 	OwnerID     string  `json:"owner_id"`
 	CreatedAt   string  `json:"created_at"`
 	ArchivedAt  *string `json:"archived_at"`
+	MemberCount int     `json:"member_count"`
+	ActiveTasks int     `json:"active_task_count"`
 }
 
 // CreateWorkspaceRequest is the body for POST /workspaces.
@@ -102,6 +104,8 @@ func (h *Handler) CreateWorkspace(c *gin.Context) {
 		return
 	}
 
+	w.MemberCount = 1
+	w.ActiveTasks = 0
 	c.JSON(http.StatusCreated, gin.H{"data": w})
 }
 
@@ -112,7 +116,21 @@ func (h *Handler) ListWorkspaces(c *gin.Context) {
 
 	rows, err := h.DB.Query(context.Background(),
 		`SELECT w.id, w.name, w.slug, COALESCE(w.description,''), w.owner_id,
-		        w.created_at::text, w.archived_at::text
+		        w.created_at::text, w.archived_at::text,
+		        (
+		          SELECT COUNT(*)
+		          FROM stract.workspace_members members
+		          WHERE members.workspace_id = w.id
+		        )::int AS member_count,
+		        (
+		          SELECT COUNT(*)
+		          FROM stract.tasks t
+		          JOIN stract.projects p ON p.id = t.project_id
+		          WHERE p.workspace_id = w.id
+		            AND p.archived_at IS NULL
+		            AND t.deleted_at IS NULL
+		            AND COALESCE(t.status, 'todo') <> 'done'
+		        )::int AS active_task_count
 		 FROM stract.workspaces w
 		 JOIN stract.workspace_members wm ON wm.workspace_id = w.id
 		 WHERE wm.user_id = $1
@@ -129,7 +147,17 @@ func (h *Handler) ListWorkspaces(c *gin.Context) {
 	workspaces := []Workspace{}
 	for rows.Next() {
 		var w Workspace
-		if err := rows.Scan(&w.ID, &w.Name, &w.Slug, &w.Description, &w.OwnerID, &w.CreatedAt, &w.ArchivedAt); err != nil {
+		if err := rows.Scan(
+			&w.ID,
+			&w.Name,
+			&w.Slug,
+			&w.Description,
+			&w.OwnerID,
+			&w.CreatedAt,
+			&w.ArchivedAt,
+			&w.MemberCount,
+			&w.ActiveTasks,
+		); err != nil {
 			continue
 		}
 		workspaces = append(workspaces, w)

@@ -1,9 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getWorkspaces, getProjects } from '@/lib/api';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { getProjects, getWorkspaces } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import type { Workspace, Project, BootState } from '@/types';
+import type { BootState, Project, Workspace } from '@/types';
 
 interface AppContextValue {
   activeWorkspace: Workspace | null;
@@ -12,9 +12,14 @@ interface AppContextValue {
   workspaces: Workspace[];
   bootState: BootState;
   activeTaskId: string | null;
-  setActiveWorkspace: (w: Workspace) => Promise<void>;
-  setActiveProject: (p: Project) => void;
-  addWorkspace: (ws: Workspace) => Promise<void>;
+  setActiveWorkspace: (
+    workspace: Workspace,
+    options?: { projectId?: string | null },
+  ) => Promise<void>;
+  setActiveProject: (project: Project) => void;
+  addWorkspace: (workspace: Workspace) => Promise<void>;
+  appendWorkspace: (workspace: Workspace) => void;
+  refreshWorkspaces: () => Promise<Workspace[]>;
   refreshProjects: () => Promise<void>;
   openTask: (taskId: string) => void;
   closeTask: () => void;
@@ -37,19 +42,31 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const openTask = useCallback((id: string) => setActiveTaskId(id), []);
   const closeTask = useCallback(() => setActiveTaskId(null), []);
 
+  const refreshWorkspaces = useCallback(async () => {
+    const result = await getWorkspaces();
+    const list = result.data || [];
+    setWorkspaces(list);
+    return list;
+  }, []);
+
   const loadProjects = useCallback(async (workspaceId: string, savedProjectId: string | null = null) => {
     try {
       const result = await getProjects(workspaceId);
       const list = result.data || [];
       setProjects(list);
-      const saved = savedProjectId ? list.find((p) => p.id === savedProjectId) : null;
-      const active = saved || list[0] || null;
-      setActiveProjectState(active);
-      if (active) localStorage.setItem('activeProjectId', active.id);
-      return active;
+      const saved = savedProjectId ? list.find((project) => project.id === savedProjectId) : null;
+      const nextProject = saved || list[0] || null;
+      setActiveProjectState(nextProject);
+      if (nextProject) {
+        localStorage.setItem('activeProjectId', nextProject.id);
+      } else {
+        localStorage.removeItem('activeProjectId');
+      }
+      return nextProject;
     } catch {
       setProjects([]);
       setActiveProjectState(null);
+      localStorage.removeItem('activeProjectId');
       return null;
     }
   }, []);
@@ -59,88 +76,126 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+          setActiveWorkspaceState(null);
+          setActiveProjectState(null);
+          setProjects([]);
           setBootState('unauthenticated');
           return;
         }
 
-        const savedWsId = localStorage.getItem('activeWorkspaceId');
-        const savedPjId = localStorage.getItem('activeProjectId');
-
-        const result = await getWorkspaces();
-        const list = result.data || [];
-        setWorkspaces(list);
+        const savedWorkspaceId = localStorage.getItem('activeWorkspaceId');
+        const savedProjectId = localStorage.getItem('activeProjectId');
+        const list = await refreshWorkspaces();
 
         if (list.length === 0) {
+          setActiveWorkspaceState(null);
+          setActiveProjectState(null);
+          setProjects([]);
           setBootState('no-workspace');
           return;
         }
 
-        const saved = savedWsId ? list.find((w: Workspace) => w.id === savedWsId) : null;
-        const ws = saved || list[0];
-        if (ws) {
-          setActiveWorkspaceState(ws);
-          localStorage.setItem('activeWorkspaceId', ws.id);
-          await loadProjects(ws.id, savedPjId);
+        if (list.length === 1) {
+          const workspace = list[0];
+          setActiveWorkspaceState(workspace);
+          localStorage.setItem('activeWorkspaceId', workspace.id);
+          await loadProjects(workspace.id, savedProjectId);
+          setBootState('ready');
+          return;
         }
-        setBootState('ready');
+
+        const savedWorkspace = savedWorkspaceId
+          ? list.find((workspace) => workspace.id === savedWorkspaceId) || null
+          : null;
+
+        setActiveWorkspaceState(savedWorkspace);
+        setActiveProjectState(null);
+        setProjects([]);
+        setBootState('workspace-selection');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown boot error';
         console.error('[AppContext] boot error:', message);
         setBootState('no-workspace');
       }
     };
+
     boot();
-  }, [loadProjects]);
+  }, [loadProjects, refreshWorkspaces]);
 
-  const setActiveWorkspace = useCallback(async (ws: Workspace) => {
-    setActiveWorkspaceState(ws);
+  const setActiveWorkspace = useCallback(async (
+    workspace: Workspace,
+    options?: { projectId?: string | null },
+  ) => {
+    setActiveWorkspaceState(workspace);
     setActiveProjectState(null);
     setProjects([]);
-    localStorage.setItem('activeWorkspaceId', ws.id);
-    localStorage.removeItem('activeProjectId');
-    await loadProjects(ws.id);
+    setActiveTaskId(null);
+    setBootState('ready');
+    localStorage.setItem('activeWorkspaceId', workspace.id);
+    if (options?.projectId) {
+      localStorage.setItem('activeProjectId', options.projectId);
+    } else {
+      localStorage.removeItem('activeProjectId');
+    }
+    await loadProjects(workspace.id, options?.projectId ?? null);
   }, [loadProjects]);
 
-  /** Called after a successful POST /workspaces — appends and switches. */
-  const addWorkspace = useCallback(async (ws: Workspace) => {
-    setWorkspaces((prev) => [...prev, ws]);
-    setActiveWorkspaceState(ws);
+  const appendWorkspace = useCallback((workspace: Workspace) => {
+    setWorkspaces((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === workspace.id);
+      if (existingIndex === -1) {
+        return [...prev, workspace];
+      }
+
+      return prev.map((item) => (item.id === workspace.id ? { ...item, ...workspace } : item));
+    });
+  }, []);
+
+  const addWorkspace = useCallback(async (workspace: Workspace) => {
+    appendWorkspace(workspace);
+    setActiveWorkspaceState(workspace);
     setActiveProjectState(null);
     setProjects([]);
-    localStorage.setItem('activeWorkspaceId', ws.id);
+    setActiveTaskId(null);
+    localStorage.setItem('activeWorkspaceId', workspace.id);
     localStorage.removeItem('activeProjectId');
     setBootState('ready');
-    // Projects will be empty → sidebar auto-opens project form
-    await loadProjects(ws.id);
-  }, [loadProjects]);
+    await loadProjects(workspace.id);
+  }, [appendWorkspace, loadProjects]);
 
   const setActiveProject = useCallback((project: Project) => {
     setActiveProjectState(project);
-    if (project) localStorage.setItem('activeProjectId', project.id);
+    localStorage.setItem('activeProjectId', project.id);
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    if (!activeWorkspace) return;
-    await loadProjects(activeWorkspace.id, activeProject?.id);
-  }, [activeWorkspace, activeProject, loadProjects]);
+    if (!activeWorkspace) {
+      return;
+    }
+
+    await loadProjects(activeWorkspace.id, activeProject?.id ?? null);
+  }, [activeProject?.id, activeWorkspace, loadProjects]);
 
   return (
-    <AppContext.Provider value={{
-      activeWorkspace,
-      activeProject,
-      workspaces,
-      projects,
-      bootState,
-      activeTaskId,
-      setActiveWorkspace,
-      setActiveProject,
-      addWorkspace,
-      refreshProjects,
-      openTask,
-      closeTask,
-    }}>
+    <AppContext.Provider
+      value={{
+        activeWorkspace,
+        activeProject,
+        workspaces,
+        projects,
+        bootState,
+        activeTaskId,
+        setActiveWorkspace,
+        setActiveProject,
+        addWorkspace,
+        appendWorkspace,
+        refreshWorkspaces,
+        refreshProjects,
+        openTask,
+        closeTask,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
 }
-

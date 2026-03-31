@@ -15,6 +15,8 @@ export interface Workspace {
   description: string | null;
   archived_at: string | null;
   created_at: string;
+  member_count?: number;
+  active_task_count?: number;
 }
 
 export interface WorkspaceMember {
@@ -103,7 +105,8 @@ export type ActivityType =
   | 'comment'
   | 'status_change'
   | 'field_change'
-  | 'created';
+  | 'created'
+  | 'system';
 
 export interface Activity {
   id: string;
@@ -116,6 +119,28 @@ export interface Activity {
   content: string | null;
   before_value: string | null;
   after_value: string | null;
+  created_at: string;
+}
+
+export interface PendingInvitation {
+  token: string;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_color: string;
+  invited_by_name: string;
+  expires_at: string;
+}
+
+export interface UserActivity {
+  activity_id: string;
+  task_id: string;
+  task_title: string;
+  project_id?: string;
+  project_name: string;
+  workspace_id: string;
+  workspace_name: string;
+  type: ActivityType;
+  content: string | null;
   created_at: string;
 }
 
@@ -146,6 +171,7 @@ export type BootState =
   | 'loading'
   | 'unauthenticated'
   | 'no-workspace'
+  | 'workspace-selection'
   | 'no-project'
   | 'ready';
 
