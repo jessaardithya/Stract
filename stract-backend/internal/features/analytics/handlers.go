@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -41,6 +42,10 @@ type Handler struct {
 	// workspace-scoped cache keyed by "workspaceID:projectID"
 	wsMu    sync.Mutex
 	wsCache map[string]*wsCacheEntry
+
+	// reports cache keyed by "workspaceID"
+	reportsMu    sync.Mutex
+	reportsCache map[string]*reportsCacheEntry
 }
 
 type wsCacheEntry struct {
@@ -48,10 +53,17 @@ type wsCacheEntry struct {
 	cachedAt time.Time
 }
 
+type reportsCacheEntry struct {
+	value    *WorkspaceReports
+	cachedAt time.Time
+}
+
 func NewHandler(db *pgxpool.Pool) *Handler {
+	log.Printf("[analytics] Initializing analytics handler")
 	return &Handler{
-		DB:      db,
-		wsCache: make(map[string]*wsCacheEntry),
+		DB:           db,
+		wsCache:      make(map[string]*wsCacheEntry),
+		reportsCache: make(map[string]*reportsCacheEntry),
 	}
 }
 
@@ -65,6 +77,7 @@ func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 func RegisterWorkspaceRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("/analytics/summary", h.GetWorkspaceSummary)
+	router.GET("/analytics/reports", h.GetWorkspaceReports)
 }
 
 // GetSummary handles the legacy GET /api/v1/analytics/summary.

@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MailCheck } from 'lucide-react';
 
+const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
+
 const friendlyError = (msg: string) => {
   if (msg.includes('Invalid login credentials')) return 'Incorrect email or password';
   if (msg.includes('Email not confirmed')) return 'Please confirm your email before signing in';
@@ -52,6 +54,7 @@ export default function Signup() {
     if (error) {
       setError(friendlyError(error.message));
     } else if (data.session) {
+      window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
       router.replace('/home');
     } else {
       setSuccess(true);

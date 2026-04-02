@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
+
 const friendlyError = (msg: string) => {
   if (msg.includes('Invalid login credentials')) return 'Incorrect email or password';
   if (msg.includes('Email not confirmed')) return 'Please confirm your email before signing in';
@@ -37,6 +39,7 @@ export default function Login() {
     if (error) {
       setError(friendlyError(error.message));
     } else {
+      window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
       router.replace('/home');
     }
     setLoading(false);

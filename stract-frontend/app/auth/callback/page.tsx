@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 
+const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
+
 export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
         router.replace('/home');
       } else {
         router.replace('/login');

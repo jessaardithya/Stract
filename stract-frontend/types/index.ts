@@ -1,4 +1,4 @@
-// ─── Auth ──────────────────────────────────────────────────────────────────
+// Auth
 export interface User {
   id: string;
   email: string;
@@ -6,7 +6,7 @@ export interface User {
   avatar_url: string | null;
 }
 
-// ─── Workspace ─────────────────────────────────────────────────────────────
+// Workspace
 export interface Workspace {
   id: string;
   name: string;
@@ -27,7 +27,7 @@ export interface WorkspaceMember {
   role: 'owner' | 'member';
 }
 
-// ─── Project ───────────────────────────────────────────────────────────────
+// Project
 export interface Project {
   id: string;
   workspace_id: string;
@@ -52,7 +52,7 @@ export interface Label {
   created_at: string;
 }
 
-// ─── Status ────────────────────────────────────────────────────────────────
+// Status
 export interface ProjectStatus {
   id: string;
   project_id: string;
@@ -62,7 +62,7 @@ export interface ProjectStatus {
   created_at: string;
 }
 
-// ─── Task ──────────────────────────────────────────────────────────────────
+// Task
 export type Priority = 'low' | 'medium' | 'high';
 
 export interface Task {
@@ -90,7 +90,7 @@ export interface Task {
   };
 }
 
-// ─── Subtask ───────────────────────────────────────────────────────────────
+// Subtask
 export interface Subtask {
   id: string;
   task_id: string;
@@ -100,7 +100,7 @@ export interface Subtask {
   created_at: string;
 }
 
-// ─── Activity ──────────────────────────────────────────────────────────────
+// Activity
 export type ActivityType =
   | 'comment'
   | 'status_change'
@@ -135,7 +135,7 @@ export interface UserActivity {
   activity_id: string;
   task_id: string;
   task_title: string;
-  project_id?: string;
+  project_id: string;
   project_name: string;
   workspace_id: string;
   workspace_name: string;
@@ -144,7 +144,7 @@ export interface UserActivity {
   created_at: string;
 }
 
-// ─── Analytics ─────────────────────────────────────────────────────────────
+// Analytics
 export interface AnalyticsSummary {
   project_id: string;
   total_active: number;
@@ -160,13 +160,84 @@ export interface AnalyticsSummary {
   backlog_health: 'good' | 'warning' | 'critical';
 }
 
-// ─── API ───────────────────────────────────────────────────────────────────
+export interface WorkspaceReports {
+  kpis: ReportKPIs;
+  status_distribution: StatusDistribution[];
+  priority_breakdown: PriorityBreakdown[];
+  velocity_over_time: VelocityData[];
+  completion_rate_over_time: CompletionRateData[];
+  burndown: BurndownData[];
+  assignee_workload: AssigneeWorkload[];
+  stale_trend: StaleTrendData[];
+  projects_summary: ProjectSummaryItem[];
+}
+
+export interface ReportKPIs {
+  total_active: number;
+  completed_today: number;
+  velocity_7d: number;
+  velocity_30d: number;
+  stale_count: number;
+  completion_rate: number;
+  backlog_health: 'good' | 'warning' | 'critical';
+}
+
+export interface StatusDistribution {
+  status_name: string;
+  color: string;
+  count: number;
+}
+
+export interface PriorityBreakdown {
+  priority: string;
+  count: number;
+}
+
+export interface VelocityData {
+  week: string;
+  completed: number;
+}
+
+export interface CompletionRateData {
+  date: string;
+  rate: number;
+}
+
+export interface BurndownData {
+  date: string;
+  remaining: number;
+  ideal: number;
+}
+
+export interface AssigneeWorkload {
+  name: string;
+  avatar_url: string | null;
+  todo: number;
+  in_progress: number;
+  done: number;
+}
+
+export interface StaleTrendData {
+  week: string;
+  stale: number;
+}
+
+export interface ProjectSummaryItem {
+  id: string;
+  name: string;
+  color: string;
+  total: number;
+  completed: number;
+  completion_rate: number;
+}
+
+// API
 export interface ApiResponse<T> {
   data: T;
   error?: string;
 }
 
-// ─── App State ─────────────────────────────────────────────────────────────
+// App State
 export type BootState =
   | 'loading'
   | 'unauthenticated'

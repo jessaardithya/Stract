@@ -7,6 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 
 const COLUMN_SKELETONS = 3;
+const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
 
 function FullPageSkeleton() {
   return (
@@ -40,21 +41,24 @@ interface BootGateProps {
 }
 
 export default function BootGate({ children }: BootGateProps) {
-  const { bootState } = useApp();
+  const { bootState, activeWorkspace } = useApp();
   const pathname = usePathname();
   const router = useRouter();
 
-  const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/auth/callback';
+  const isAuthPage =
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/auth/callback';
   const isWorkspaceHome = pathname === '/home';
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session && !isAuthPage) {
         router.replace('/login');
-        return;
-      }
-
-      if (session && isAuthPage) {
+      } else if (session && isAuthPage) {
+        window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
         window.location.href = '/home';
       }
     });
@@ -63,16 +67,21 @@ export default function BootGate({ children }: BootGateProps) {
   }, [isAuthPage, router]);
 
   useEffect(() => {
+    const shouldForceWorkspaceHome =
+      typeof window !== 'undefined' &&
+      window.sessionStorage.getItem(FORCE_WORKSPACE_HOME_KEY) === '1';
+
     if (bootState === 'unauthenticated' && !isAuthPage) {
       router.replace('/login');
       return;
     }
 
-    if (
-      (bootState === 'workspace-selection' || bootState === 'no-workspace') &&
-      !isAuthPage &&
-      !isWorkspaceHome
-    ) {
+    if (shouldForceWorkspaceHome && !isAuthPage && !isWorkspaceHome) {
+      router.replace('/home');
+      return;
+    }
+
+    if ((bootState === 'workspace-selection' || bootState === 'no-workspace') && !isWorkspaceHome) {
       router.replace('/home');
     }
   }, [bootState, isAuthPage, isWorkspaceHome, router]);
@@ -92,12 +101,12 @@ export default function BootGate({ children }: BootGateProps) {
     return <FullPageSkeleton />;
   }
 
-  if (isWorkspaceHome) {
-    return <div className="min-h-screen bg-[#fafaf8]">{children}</div>;
+  if (bootState === 'workspace-selection' && !isWorkspaceHome && !activeWorkspace) {
+    return <FullPageSkeleton />;
   }
 
-  if (bootState === 'workspace-selection' || bootState === 'no-workspace') {
-    return <FullPageSkeleton />;
+  if (isWorkspaceHome) {
+    return <div className="min-h-screen bg-[#fafaf8]">{children}</div>;
   }
 
   return (

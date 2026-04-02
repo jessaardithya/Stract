@@ -7,10 +7,9 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { cn } from "@/lib/utils"
 
 function Select({
-  modal = false,
+  modal: _modal = false,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root> & { modal?: boolean }) {
-  void modal
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }
 

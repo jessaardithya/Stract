@@ -1,9 +1,13 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getProjects, getWorkspaces } from '@/lib/api';
+import { getPendingInvitations, getProjects, getWorkspaces } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import type { BootState, Project, Workspace } from '@/types';
+
+const ACTIVE_WORKSPACE_ID_KEY = 'activeWorkspaceId';
+const ACTIVE_PROJECT_ID_KEY = 'activeProjectId';
+const LAST_USED_WORKSPACE_ID_KEY = 'lastUsedWorkspaceId';
 
 interface AppContextValue {
   activeWorkspace: Workspace | null;
@@ -83,11 +87,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        const savedWorkspaceId = localStorage.getItem('activeWorkspaceId');
-        const savedProjectId = localStorage.getItem('activeProjectId');
-        const list = await refreshWorkspaces();
+        const savedWorkspaceId = localStorage.getItem(ACTIVE_WORKSPACE_ID_KEY);
+        const savedProjectId = localStorage.getItem(ACTIVE_PROJECT_ID_KEY);
+        const [list, invitationsResult] = await Promise.all([
+          refreshWorkspaces(),
+          getPendingInvitations(),
+        ]);
+        const pendingInvitations = invitationsResult.data || [];
 
-        if (list.length === 0) {
+        if (list.length === 0 && pendingInvitations.length === 0) {
           setActiveWorkspaceState(null);
           setActiveProjectState(null);
           setProjects([]);
@@ -95,20 +103,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        if (list.length === 1) {
+        if (list.length === 1 && pendingInvitations.length === 0) {
           const workspace = list[0];
           setActiveWorkspaceState(workspace);
-          localStorage.setItem('activeWorkspaceId', workspace.id);
+          localStorage.setItem(ACTIVE_WORKSPACE_ID_KEY, workspace.id);
+          localStorage.setItem(LAST_USED_WORKSPACE_ID_KEY, workspace.id);
           await loadProjects(workspace.id, savedProjectId);
           setBootState('ready');
           return;
         }
 
-        const savedWorkspace = savedWorkspaceId
-          ? list.find((workspace) => workspace.id === savedWorkspaceId) || null
-          : null;
+        if (savedWorkspaceId) {
+          localStorage.setItem(LAST_USED_WORKSPACE_ID_KEY, savedWorkspaceId);
+        }
 
-        setActiveWorkspaceState(savedWorkspace);
+        localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+        localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
+        setActiveWorkspaceState(null);
         setActiveProjectState(null);
         setProjects([]);
         setBootState('workspace-selection');
@@ -130,24 +141,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     setActiveProjectState(null);
     setProjects([]);
     setActiveTaskId(null);
-    setBootState('ready');
-    localStorage.setItem('activeWorkspaceId', workspace.id);
+    localStorage.setItem(ACTIVE_WORKSPACE_ID_KEY, workspace.id);
+    localStorage.setItem(LAST_USED_WORKSPACE_ID_KEY, workspace.id);
     if (options?.projectId) {
-      localStorage.setItem('activeProjectId', options.projectId);
+      localStorage.setItem(ACTIVE_PROJECT_ID_KEY, options.projectId);
     } else {
-      localStorage.removeItem('activeProjectId');
+      localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
     }
     await loadProjects(workspace.id, options?.projectId ?? null);
+    setBootState('ready');
   }, [loadProjects]);
 
   const appendWorkspace = useCallback((workspace: Workspace) => {
     setWorkspaces((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === workspace.id);
-      if (existingIndex === -1) {
-        return [...prev, workspace];
+      if (prev.some((item) => item.id === workspace.id)) {
+        return prev.map((item) => (item.id === workspace.id ? { ...item, ...workspace } : item));
       }
-
-      return prev.map((item) => (item.id === workspace.id ? { ...item, ...workspace } : item));
+      return [...prev, workspace];
     });
   }, []);
 
@@ -157,15 +167,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     setActiveProjectState(null);
     setProjects([]);
     setActiveTaskId(null);
-    localStorage.setItem('activeWorkspaceId', workspace.id);
-    localStorage.removeItem('activeProjectId');
+    localStorage.setItem(ACTIVE_WORKSPACE_ID_KEY, workspace.id);
+    localStorage.setItem(LAST_USED_WORKSPACE_ID_KEY, workspace.id);
+    localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
     setBootState('ready');
     await loadProjects(workspace.id);
   }, [appendWorkspace, loadProjects]);
 
   const setActiveProject = useCallback((project: Project) => {
     setActiveProjectState(project);
-    localStorage.setItem('activeProjectId', project.id);
+    localStorage.setItem(ACTIVE_PROJECT_ID_KEY, project.id);
   }, []);
 
   const refreshProjects = useCallback(async () => {

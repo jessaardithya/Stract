@@ -30,6 +30,7 @@
     AlertDialogTitle,
   } from "@/components/ui/alert-dialog";
   import {
+    House,
     LayoutDashboard,
     Settings,
     Plus,
@@ -42,6 +43,7 @@
     LogOut,
     LayoutList,
     AlertTriangle,
+    BarChart2,
     Trash2,
     ChevronLeft,
     ChevronRight,
@@ -71,8 +73,14 @@
     "#6b7280",
   ];
 
+  const ACTIVE_WORKSPACE_ID_KEY = "activeWorkspaceId";
+  const ACTIVE_PROJECT_ID_KEY = "activeProjectId";
+  const LAST_USED_WORKSPACE_ID_KEY = "lastUsedWorkspaceId";
+  const FORCE_WORKSPACE_HOME_KEY = "forceWorkspaceHome";
+
   const BOTTOM_NAV = [
-    { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+    { href: "/home", label: "Home", Icon: House },
+    { href: "/dashboard", label: "Reports", Icon: BarChart2 },
     { href: "/settings", label: "Settings", Icon: Settings },
   ];
 
@@ -276,8 +284,10 @@
 
       try {
         await deleteWorkspace(activeWorkspace.id);
-        localStorage.removeItem("activeWorkspaceId");
-        localStorage.removeItem("activeProjectId");
+        localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+        localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
+        localStorage.removeItem(LAST_USED_WORKSPACE_ID_KEY);
+        window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
         window.location.reload();
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
@@ -484,8 +494,10 @@
                   <button
                     onClick={async () => {
                       await supabase.auth.signOut();
-                      localStorage.removeItem("activeWorkspaceId");
-                      localStorage.removeItem("activeProjectId");
+                      localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+                      localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
+                      localStorage.removeItem(LAST_USED_WORKSPACE_ID_KEY);
+                      window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
                       router.push("/login");
                     }}
                     className="w-full flex items-center gap-2 px-2 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"

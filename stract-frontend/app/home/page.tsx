@@ -25,6 +25,11 @@ import { supabase } from '@/lib/supabase';
 import type { PendingInvitation, UserActivity, Workspace } from '@/types';
 import { deriveSlug } from '@/utils/slug';
 
+const ACTIVE_WORKSPACE_ID_KEY = 'activeWorkspaceId';
+const ACTIVE_PROJECT_ID_KEY = 'activeProjectId';
+const LAST_USED_WORKSPACE_ID_KEY = 'lastUsedWorkspaceId';
+const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
+
 function HomeSkeleton() {
   return (
     <div className="min-h-screen bg-[#fafaf8]">
@@ -118,7 +123,10 @@ export default function WorkspaceHomePage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setLastUsedWorkspaceId(localStorage.getItem('activeWorkspaceId'));
+      setLastUsedWorkspaceId(
+        localStorage.getItem(LAST_USED_WORKSPACE_ID_KEY) ||
+        localStorage.getItem(ACTIVE_WORKSPACE_ID_KEY),
+      );
     }
   }, []);
 
@@ -159,11 +167,6 @@ export default function WorkspaceHomePage() {
         setActivity(nextActivity);
         setDisplayName(nextName);
 
-        if (workspaceItems.length === 1 && nextInvitations.length === 0) {
-          await setActiveWorkspace(workspaceItems[0]);
-          startTransition(() => router.replace('/'));
-          return;
-        }
       } catch (err) {
         console.error('[home] failed to load workspace hub', err);
       } finally {
@@ -177,7 +180,7 @@ export default function WorkspaceHomePage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshWorkspaces, router, setActiveWorkspace]);
+  }, [refreshWorkspaces]);
 
   const shouldShowCreateWorkspace = useMemo(
     () => !loading && workspaceList.length === 0 && pendingInvitations.length === 0,
@@ -215,6 +218,7 @@ export default function WorkspaceHomePage() {
     setLastUsedWorkspaceId(workspace.id);
 
     try {
+      window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
       await setActiveWorkspace(workspace, { projectId: options?.projectId ?? null });
       startTransition(() => router.push('/'));
 
@@ -249,6 +253,7 @@ export default function WorkspaceHomePage() {
       resetWorkspaceDialog();
       await addWorkspace(result.data);
       setLastUsedWorkspaceId(result.data.id);
+      window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
       startTransition(() => router.push('/'));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
@@ -305,8 +310,10 @@ export default function WorkspaceHomePage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('activeWorkspaceId');
-    localStorage.removeItem('activeProjectId');
+    localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+    localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
+    localStorage.removeItem(LAST_USED_WORKSPACE_ID_KEY);
+    window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
     router.replace('/login');
   };
 

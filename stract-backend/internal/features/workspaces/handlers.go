@@ -65,13 +65,12 @@ func (h *Handler) CreateWorkspace(c *gin.Context) {
 
 	ctx := context.Background()
 
-	// -- Transaction: insert workspace + membership atomically --
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
 		return
 	}
-	defer tx.Rollback(ctx) // noop if committed
+	defer tx.Rollback(ctx)
 
 	var w Workspace
 	err = tx.QueryRow(ctx,
@@ -117,22 +116,25 @@ func (h *Handler) ListWorkspaces(c *gin.Context) {
 	rows, err := h.DB.Query(context.Background(),
 		`SELECT w.id, w.name, w.slug, COALESCE(w.description,''), w.owner_id,
 		        w.created_at::text, w.archived_at::text,
-		        (
-		          SELECT COUNT(*)
-		          FROM stract.workspace_members members
-		          WHERE members.workspace_id = w.id
-		        )::int AS member_count,
-		        (
-		          SELECT COUNT(*)
-		          FROM stract.tasks t
-		          JOIN stract.projects p ON p.id = t.project_id
-		          WHERE p.workspace_id = w.id
-		            AND p.archived_at IS NULL
-		            AND t.deleted_at IS NULL
-		            AND COALESCE(t.status, 'todo') <> 'done'
-		        )::int AS active_task_count
+		        COALESCE(member_counts.member_count, 0) AS member_count,
+		        COALESCE(task_counts.active_task_count, 0) AS active_task_count
 		 FROM stract.workspaces w
 		 JOIN stract.workspace_members wm ON wm.workspace_id = w.id
+		 LEFT JOIN (
+		   SELECT workspace_id, COUNT(*)::int AS member_count
+		   FROM stract.workspace_members
+		   GROUP BY workspace_id
+		 ) member_counts ON member_counts.workspace_id = w.id
+		 LEFT JOIN (
+		   SELECT p.workspace_id, COUNT(t.id)::int AS active_task_count
+		   FROM stract.projects p
+		   LEFT JOIN stract.tasks t
+		     ON t.project_id = p.id
+		    AND t.deleted_at IS NULL
+		    AND t.status <> 'done'
+		   WHERE p.archived_at IS NULL
+		   GROUP BY p.workspace_id
+		 ) task_counts ON task_counts.workspace_id = w.id
 		 WHERE wm.user_id = $1
 		   AND w.archived_at IS NULL
 		 ORDER BY w.created_at ASC`,
@@ -203,7 +205,6 @@ func (h *Handler) UpdateWorkspace(c *gin.Context) {
 		return
 	}
 
-	// Only allow owner to update
 	var w Workspace
 	err := h.DB.QueryRow(context.Background(),
 		`UPDATE stract.workspaces
@@ -279,5 +280,4 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-// ensure time import is used (for future TTL work)
 var _ = time.Now

@@ -1,7 +1,18 @@
 import { supabase } from '@/lib/supabase';
 import type {
-  ApiResponse, Task, Project, Workspace, WorkspaceMember,
-  ProjectStatus, Subtask, Activity, AnalyticsSummary, PendingInvitation, Priority, UserActivity
+  Activity,
+  AnalyticsSummary,
+  ApiResponse,
+  PendingInvitation,
+  Priority,
+  Project,
+  ProjectStatus,
+  Subtask,
+  Task,
+  UserActivity,
+  Workspace,
+  WorkspaceMember,
+  WorkspaceReports,
 } from '@/types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
@@ -13,17 +24,6 @@ const authHeaders = async (): Promise<Record<string, string>> => {
     'Authorization': `Bearer ${session?.access_token ?? ''}`,
   };
 };
-
-// const apiFetch = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
-//   const headers = await authHeaders();
-//   const url = path.startsWith('http') ? path : `${API_BASE}${path.replace(/^\/api\/v1/, '')}`;
-//   const res = await fetch(url, { ...options, headers });
-//   if (res.status === 401) {
-//     await supabase.auth.signOut();
-//     window.location.href = '/login';
-//   }
-//   return res.json() as Promise<T>;
-// };
 
 const apiFetch = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
   const headers = await authHeaders();
@@ -264,4 +264,9 @@ export const getAnalytics = (
 ): Promise<AnalyticsSummary> =>
   apiFetch<AnalyticsSummary | ApiResponse<AnalyticsSummary>>(
     `/api/v1/workspaces/${workspaceId}/analytics/summary?project_id=${projectId}`,
-  ).then((result) => ("data" in result ? result.data : result));
+  ).then((result) => ('data' in result ? result.data : result));
+
+export const getWorkspaceReports = (
+  workspaceId: string
+): Promise<WorkspaceReports> =>
+  apiFetch<WorkspaceReports>(`/api/v1/workspaces/${workspaceId}/analytics/reports`);
