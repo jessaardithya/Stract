@@ -1,0 +1,26 @@
+# Go cache
+.gocache/
+
+# Go build artifacts
+stract-backend/stract-api.exe
+stract-backend/bin/
+
+# Node.js dependencies
+stract-frontend/node_modules/
+stract-frontend/.next/
+stract-frontend/out/
+stract-frontend/build/
+
+# Local envs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

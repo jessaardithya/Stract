@@ -49,6 +49,8 @@
     ChevronRight,
     CalendarDays,
     CalendarRange,
+    NotebookText,
+    FileInput,
   } from "lucide-react";
   import { useApp } from "@/context/AppContext";
   import {
@@ -224,15 +226,26 @@
     const [wsDeleteAlertOpen, setWsDeleteAlertOpen] = useState<boolean>(false);
     const [wsDeleteError, setWsDeleteError] = useState<string>("");
     const [isDeletingWs, setIsDeletingWs] = useState<boolean>(false);
+    const [accountOpen, setAccountOpen] = useState<boolean>(false);
 
-    const openWsSettings = (e: React.MouseEvent) => {
-      e.stopPropagation();
+    const openWsSettings = (e?: React.MouseEvent) => {
+      e?.stopPropagation();
       if (activeWorkspace) {
         setEditWsName(activeWorkspace.name);
         setEditWsDescription(activeWorkspace.description || "");
         setWsSettingsOpen(true);
         setWsOpen(false);
       }
+    };
+
+    const handleSignOut = async () => {
+      await supabase.auth.signOut();
+      localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+      localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
+      localStorage.removeItem(LAST_USED_WORKSPACE_ID_KEY);
+      window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
+      setAccountOpen(false);
+      window.location.href = "/login";
     };
 
     const handleUpdateWorkspace = async () => {
@@ -491,20 +504,6 @@
                     <Plus size={13} />
                     New Workspace
                   </button>
-                  <button
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
-                      localStorage.removeItem(ACTIVE_PROJECT_ID_KEY);
-                      localStorage.removeItem(LAST_USED_WORKSPACE_ID_KEY);
-                      window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
-                      router.push("/login");
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors mt-0.5"
-                  >
-                    <LogOut size={13} />
-                    Sign out
-                  </button>
                 </div>
               </PopoverContent>
             </Popover>
@@ -662,6 +661,48 @@
                         Calendar
                       </button>
                       <button
+                        onClick={() => router.push("/meetings")}
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
+                          pathname === "/meetings"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
+                        }`}
+                      >
+                        {pathname === "/meetings" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
+                        <NotebookText
+                          size={13}
+                          className="shrink-0"
+                          style={pathname === "/meetings" ? { color: p.color } : undefined}
+                        />
+                        Meetings
+                      </button>
+                      <button
+                        onClick={() => router.push("/forms")}
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
+                          pathname === "/forms"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
+                        }`}
+                      >
+                        {pathname === "/forms" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
+                        <FileInput
+                          size={13}
+                          className="shrink-0"
+                          style={pathname === "/forms" ? { color: p.color } : undefined}
+                        />
+                        Forms
+                      </button>
+                      <button
                         onClick={openProjectSettings}
                         className="w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] text-[#8a8a85] hover:text-gray-950 transition-colors"
                       >
@@ -776,6 +817,27 @@
               )}
               {BOTTOM_NAV.map(({ href, label, Icon }) => {
                 const active = pathname === href;
+                const opensWorkspaceSettings = label === "Settings";
+
+                if (opensWorkspaceSettings) {
+                  return (
+                    <button
+                      key={href}
+                      type="button"
+                      title={isCollapsed ? label : undefined}
+                      onClick={() => openWsSettings()}
+                      className={`relative mb-1 flex items-center transition-colors ${
+                        isCollapsed
+                          ? "mx-auto h-11 w-11 justify-center"
+                          : "w-full gap-3 px-3 py-2 text-sm"
+                      } text-[#4f4a43] hover:bg-white/55 hover:text-gray-950`}
+                    >
+                      <Icon size={15} className="text-[#8a8a85] shrink-0" />
+                      {!isCollapsed && <span className="font-medium">{label}</span>}
+                    </button>
+                  );
+                }
+
                 return (
                   <Link
                     key={href}
@@ -811,34 +873,64 @@
 
           <div
             className={`border-t border-[#e7e1d8] py-3.5 ${
-              isCollapsed ? "px-0" : "px-4"
+              isCollapsed ? "px-2" : "px-4"
             }`}
           >
-            <div
-              className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"}`}
-            >
-              <Avatar
-                className="h-8 w-8 shrink-0 cursor-pointer border border-black/[0.05]"
-                title={isCollapsed ? "Jessa" : undefined}
+            <Popover open={accountOpen} onOpenChange={setAccountOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={`w-full transition-colors hover:bg-white/65 ${
+                    isCollapsed
+                      ? "flex justify-center rounded-xl py-1.5"
+                      : "flex items-center gap-3 rounded-2xl px-2 py-2.5 text-left"
+                  }`}
+                  title={isCollapsed ? "Account actions" : undefined}
+                >
+                  <Avatar
+                    className="h-8 w-8 shrink-0 border border-black/[0.05]"
+                  >
+                    <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
+                      J
+                    </AvatarFallback>
+                  </Avatar>
+                  {!isCollapsed && (
+                    <>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium leading-tight text-gray-950">
+                          Jessa
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-[#8a8a85]">
+                          Free plan
+                        </p>
+                      </div>
+                      <ChevronsUpDown size={13} className="shrink-0 text-[#8a8a85]" />
+                    </>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align={isCollapsed ? "center" : "start"}
+                side="top"
+                className="w-[220px] border-[#e7e1d8] bg-[#fffdf8] p-1.5 shadow-[0_18px_40px_rgba(26,26,26,0.08)]"
               >
-                <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
-                  J
-                </AvatarFallback>
-              </Avatar>
-              {!isCollapsed && (
-                <>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-950 truncate leading-tight">
-                      Jessa
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-[#8a8a85] truncate">
-                      Free plan
-                    </p>
-                  </div>
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                </>
-              )}
-            </div>
+                <div className="border-b border-[#e7e1d8] px-2 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8a8a85]">
+                    Account
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-950">Jessa</p>
+                  <p className="text-[11px] text-[#8a8a85]">Free plan</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="mt-1 flex w-full items-center gap-2 px-2 py-2 text-sm text-[#5d5a54] transition-colors hover:bg-[#f7f4ee] hover:text-gray-950"
+                >
+                  <LogOut size={13} className="shrink-0 text-[#8a8a85]" />
+                  Sign out
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         </aside>
 

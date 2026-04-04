@@ -1,2 +1,12 @@
 .env
 *.exe
+.gocache/
+
+# Logs
+*.log
+backend.log
+
+# Debug / build artifacts
+/cmd/debug_db/
+*.test
+/bin/

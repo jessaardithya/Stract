@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 
 const COLUMN_SKELETONS = 3;
 const FORCE_WORKSPACE_HOME_KEY = 'forceWorkspaceHome';
+const POST_AUTH_REDIRECT_KEY = 'postAuthRedirect';
 
 function FullPageSkeleton() {
   return (
@@ -50,48 +51,55 @@ export default function BootGate({ children }: BootGateProps) {
     pathname === '/signup' ||
     pathname === '/auth/callback';
   const isWorkspaceHome = pathname === '/home';
+  const isInvitationPage = pathname?.startsWith('/join/');
+  const isPublicFormPage = pathname?.startsWith('/f/');
 
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && !isAuthPage) {
-        router.replace('/login');
+      if (!session && !isAuthPage && !isPublicFormPage) {
+        window.location.href = '/login';
       } else if (session && isAuthPage) {
-        window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
-        window.location.href = '/home';
+        const redirectTarget = window.sessionStorage.getItem(POST_AUTH_REDIRECT_KEY) || '/home';
+        if (redirectTarget === '/home') {
+          window.sessionStorage.setItem(FORCE_WORKSPACE_HOME_KEY, '1');
+        } else {
+          window.sessionStorage.removeItem(FORCE_WORKSPACE_HOME_KEY);
+        }
+        window.location.href = redirectTarget;
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [isAuthPage, router]);
+  }, [isAuthPage, isPublicFormPage, router]);
 
   useEffect(() => {
     const shouldForceWorkspaceHome =
       typeof window !== 'undefined' &&
       window.sessionStorage.getItem(FORCE_WORKSPACE_HOME_KEY) === '1';
 
-    if (bootState === 'unauthenticated' && !isAuthPage) {
-      router.replace('/login');
+    if (bootState === 'unauthenticated' && !isAuthPage && !isInvitationPage && !isPublicFormPage) {
+      window.location.href = '/login';
       return;
     }
 
-    if (shouldForceWorkspaceHome && !isAuthPage && !isWorkspaceHome) {
+    if (shouldForceWorkspaceHome && !isAuthPage && !isWorkspaceHome && !isInvitationPage && !isPublicFormPage) {
       router.replace('/home');
       return;
     }
 
-    if ((bootState === 'workspace-selection' || bootState === 'no-workspace') && !isWorkspaceHome) {
+    if ((bootState === 'workspace-selection' || bootState === 'no-workspace') && !isWorkspaceHome && !isInvitationPage && !isPublicFormPage) {
       router.replace('/home');
     }
-  }, [bootState, isAuthPage, isWorkspaceHome, router]);
+  }, [bootState, isAuthPage, isInvitationPage, isPublicFormPage, isWorkspaceHome, router]);
 
   if (bootState === 'loading') {
     return <FullPageSkeleton />;
   }
 
   if (bootState === 'unauthenticated') {
-    if (isAuthPage) {
+    if (isAuthPage || isInvitationPage || isPublicFormPage) {
       return children;
     }
     return <FullPageSkeleton />;
@@ -106,6 +114,10 @@ export default function BootGate({ children }: BootGateProps) {
   }
 
   if (isWorkspaceHome) {
+    return <div className="min-h-screen bg-[#fafaf8]">{children}</div>;
+  }
+
+  if (isInvitationPage || isPublicFormPage) {
     return <div className="min-h-screen bg-[#fafaf8]">{children}</div>;
   }
 

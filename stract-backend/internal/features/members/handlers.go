@@ -30,6 +30,7 @@ func NewHandler(db *pgxpool.Pool) *Handler { return &Handler{DB: db} }
 func RegisterRoutes(router *gin.RouterGroup, db *pgxpool.Pool) {
 	h := NewHandler(db)
 	router.GET("/members", h.GetMembers)
+	router.DELETE("/members/:member_id", h.RemoveMember)
 	router.GET("/labels", h.GetLabels)
 }
 
@@ -68,6 +69,59 @@ func (h *Handler) GetMembers(c *gin.Context) {
 		list = []Member{}
 	}
 	c.JSON(http.StatusOK, list)
+}
+
+// RemoveMember handles DELETE /api/v1/workspaces/:workspace_id/members/:member_id
+func (h *Handler) RemoveMember(c *gin.Context) {
+	workspaceID := c.Param("workspace_id")
+	memberToRemove := c.Param("member_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// 1. Verify caller is workspace owner
+	var ownerID string
+	err := h.DB.QueryRow(context.Background(),
+		"SELECT owner_id FROM stract.workspaces WHERE id = $1 AND archived_at IS NULL",
+		workspaceID,
+	).Scan(&ownerID)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		return
+	}
+
+	if ownerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only the workspace owner can remove members"})
+		return
+	}
+
+	// 2. Prevent owner from removing themselves via this endpoint 
+	// (they should delete workspace or transfer ownership)
+	if memberToRemove == ownerID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "owner cannot be removed from workspace"})
+		return
+	}
+
+	// 3. Remove the member
+	cmdTag, err := h.DB.Exec(context.Background(),
+		"DELETE FROM stract.workspace_members WHERE workspace_id = $1 AND user_id = $2 AND role != 'owner'",
+		workspaceID, memberToRemove,
+	)
+	if err != nil {
+		log.Printf("[members] delete error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove member"})
+		return
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "member not found in this workspace"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member removed successfully"})
 }
 
 // GetLabels handles GET /api/v1/workspaces/:workspace_id/labels

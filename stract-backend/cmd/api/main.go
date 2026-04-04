@@ -20,7 +20,9 @@ import (
 	"stract-backend/internal/core/workers"
 	"stract-backend/internal/features/activity"
 	"stract-backend/internal/features/analytics"
+	"stract-backend/internal/features/forms"
 	"stract-backend/internal/features/invitations"
+	"stract-backend/internal/features/meetings"
 	"stract-backend/internal/features/members"
 	"stract-backend/internal/features/projects"
 	"stract-backend/internal/features/statuses"
@@ -63,6 +65,10 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Stract API is online!", "status": "healthy"})
 	})
 
+	// ── Public routes (NO auth required) ─────────────────────────────────────
+	publicGroup := r.Group("/api/v1")
+	forms.RegisterPublicRoutes(publicGroup, db)
+
 	// ── JWT-authenticated group ────────────────────────────────────────────────
 	apiV1 := r.Group("/api/v1")
 	apiV1.Use(middleware.Auth())
@@ -78,7 +84,7 @@ func main() {
 	invitations.RegisterRoutes(apiV1, db)
 	users.RegisterRoutes(apiV1, db)
 
-	// ── Workspace-member-gated group ──────────────────────────────────────────
+	// ── Workspace-member-gated group ─────────────────────────────────────────────
 	wsGroup := apiV1.Group("/workspaces/:workspace_id")
 	wsGroup.Use(middleware.RequireWorkspaceMember(db))
 
@@ -96,6 +102,12 @@ func main() {
 	statusGroup := projectGroup.Group("/:id/statuses")
 	statuses.RegisterRoutes(statusGroup, db)
 
+	// Meetings under project
+	meetings.RegisterRoutes(projectGroup, db)
+
+	// Forms under project
+	forms.RegisterRoutes(projectGroup, db)
+
 	// Tasks under workspace (workspace-scoped, project_id required)
 	tasks.RegisterWorkspaceRoutes(wsGroup, db)
 
@@ -104,6 +116,7 @@ func main() {
 
 	// Members & Labels under workspace
 	members.RegisterRoutes(wsGroup, db)
+	invitations.RegisterWorkspaceRoutes(wsGroup, db)
 
 	// Feature: Task Details (Subtasks/Activity)
 	// These move to /api/v1/workspaces/:workspace_id/tasks/:id/...

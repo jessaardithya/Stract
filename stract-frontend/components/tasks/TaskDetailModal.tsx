@@ -887,6 +887,29 @@ export default function TaskDetailModal() {
                   </Popover>
                 </PropItem>
 
+                {/* Creator */}
+                <PropItem label="Creator">
+                  <div className="flex h-8 w-full items-center justify-between px-3 text-[12.5px] font-medium bg-[#fcfcfb] border border-black/5 rounded-lg shadow-none cursor-default">
+                    {task?.creator ? (
+                      <div className="flex items-center gap-2 truncate opacity-80">
+                        <Avatar className="h-4 w-4 shrink-0">
+                          <AvatarImage src={task.creator.avatar_url ?? undefined} />
+                          <AvatarFallback className="text-[8px] uppercase font-bold bg-violet-100 text-violet-700">
+                            {task.creator.name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">
+                          {task.creator.name || task.creator.email}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-zinc-400 font-normal italic text-[12px]">
+                        Unknown creator
+                      </span>
+                    )}
+                  </div>
+                </PropItem>
+
                 {/* Due Date */}
                 <PropItem label="Due Date">
                   <Popover>

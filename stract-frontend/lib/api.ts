@@ -3,8 +3,17 @@ import type {
   Activity,
   AnalyticsSummary,
   ApiResponse,
+  CreatedInvitation,
+  FormField,
+  FormListItem,
+  FormSubmission,
+  MeetingActionItem,
+  MeetingListItem,
+  MeetingNote,
   PendingInvitation,
   Priority,
+  ProjectForm,
+  PublicFormData,
   Project,
   ProjectStatus,
   Subtask,
@@ -62,6 +71,12 @@ export const updateWorkspace = (workspaceId: string, data: Partial<Pick<Workspac
 export const deleteWorkspace = (workspaceId: string): Promise<void> =>
   apiFetch(`/api/v1/workspaces/${workspaceId}`, { method: 'DELETE' });
 
+export const getWorkspaceMembers = (workspaceId: string): Promise<WorkspaceMember[]> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/members`);
+
+export const removeWorkspaceMember = (workspaceId: string, memberId: string): Promise<ApiResponse<{ message: string }>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/members/${memberId}`, { method: 'DELETE' });
+
 export const getPendingInvitations = (): Promise<ApiResponse<PendingInvitation[]>> =>
   apiFetch('/api/v1/invitations/pending');
 
@@ -70,6 +85,15 @@ export const acceptInvitation = (token: string): Promise<ApiResponse<Workspace>>
 
 export const getMyActivity = (): Promise<ApiResponse<UserActivity[]>> =>
   apiFetch('/api/v1/users/me/activity');
+
+export const createInvitation = (
+  workspaceId: string,
+  data?: { expires_in_days?: number; invited_email?: string }
+): Promise<ApiResponse<CreatedInvitation>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
 
 // Projects
 export const getProjects = (workspaceId: string): Promise<ApiResponse<Project[]>> =>
@@ -270,3 +294,206 @@ export const getWorkspaceReports = (
   workspaceId: string
 ): Promise<WorkspaceReports> =>
   apiFetch<WorkspaceReports>(`/api/v1/workspaces/${workspaceId}/analytics/reports`);
+
+// Meetings
+export const getMeetings = (
+  workspaceId: string,
+  projectId: string
+): Promise<ApiResponse<MeetingListItem[]>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings`);
+
+export const createMeeting = (
+  workspaceId: string,
+  projectId: string
+): Promise<ApiResponse<MeetingNote>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings`, { method: 'POST', body: '{}' });
+
+export const getMeeting = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string
+): Promise<ApiResponse<MeetingNote>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}`);
+
+export const updateMeeting = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string,
+  data: Partial<Pick<MeetingNote, 'title' | 'meeting_date' | 'location' | 'attendees' | 'agenda' | 'notes' | 'decisions'>>
+): Promise<ApiResponse<MeetingNote>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteMeeting = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string
+): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}`, { method: 'DELETE' });
+
+export const createActionItem = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string,
+  data: { title: string; assignee_id?: string | null; due_date?: string | null }
+): Promise<ApiResponse<MeetingActionItem>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}/action-items`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateActionItem = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string,
+  itemId: string,
+  data: Partial<{ title: string; is_done: boolean; assignee_id: string | null; due_date: string | null }>
+): Promise<ApiResponse<MeetingActionItem>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}/action-items/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteActionItem = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string,
+  itemId: string
+): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}/action-items/${itemId}`, {
+    method: 'DELETE',
+  });
+
+export const convertActionItem = (
+  workspaceId: string,
+  projectId: string,
+  meetingId: string,
+  itemId: string
+): Promise<ApiResponse<{ task_id: string; task_title: string }>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/projects/${projectId}/meetings/${meetingId}/action-items/${itemId}/convert`, {
+    method: 'POST',
+    body: '{}',
+  });
+
+// ─── Forms ───────────────────────────────────────────────────────────────────
+
+const formBase = (workspaceId: string, projectId: string) =>
+  `/workspaces/${workspaceId}/projects/${projectId}/forms`;
+
+export const getForms = (workspaceId: string, projectId: string): Promise<ApiResponse<FormListItem[]>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}`);
+
+export const createForm = (workspaceId: string, projectId: string): Promise<ApiResponse<ProjectForm>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}`, { method: 'POST', body: '{}' });
+
+export const getForm = (workspaceId: string, projectId: string, formId: string): Promise<ApiResponse<ProjectForm>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}`);
+
+export const updateForm = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  data: Partial<Pick<ProjectForm, 'title' | 'description' | 'is_public' | 'auto_create' | 'is_active' | 'default_status_id' | 'default_priority'>>,
+): Promise<ApiResponse<ProjectForm>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteForm = (workspaceId: string, projectId: string, formId: string): Promise<ApiResponse<{ message: string }>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}`, { method: 'DELETE' });
+
+// Fields
+export const createFormField = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  data: { label: string; field_type: string; placeholder?: string; options?: string[]; is_required?: boolean; position?: number },
+): Promise<ApiResponse<FormField>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}/fields`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateFormField = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  fieldId: string,
+  data: { label?: string; placeholder?: string; options?: string[] | null; is_required?: boolean; position?: number },
+): Promise<ApiResponse<FormField>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}/fields/${fieldId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteFormField = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  fieldId: string,
+): Promise<void> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}/fields/${fieldId}`, { method: 'DELETE' });
+
+// Public form (no auth header)
+const publicHeaders = { 'Content-Type': 'application/json' };
+
+export const getPublicForm = async (slug: string): Promise<ApiResponse<PublicFormData>> => {
+  const res = await fetch(`${API_BASE}/forms/${slug}`, { headers: publicHeaders });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error || 'Form not found');
+  }
+  return res.json() as Promise<ApiResponse<PublicFormData>>;
+};
+
+export const submitForm = async (
+  slug: string,
+  data: { answers: Record<string, string>; submitter_name?: string; submitter_email?: string },
+): Promise<{ submission_id: string; message: string; auto_created: boolean; task_id?: string }> => {
+  const res = await fetch(`${API_BASE}/forms/${slug}/submit`, {
+    method: 'POST',
+    headers: publicHeaders,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error || 'Submission failed');
+  }
+  return res.json();
+};
+
+// Submissions management (auth)
+export const getSubmissions = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  status?: string,
+): Promise<ApiResponse<FormSubmission[]>> => {
+  const qs = status ? `?status=${status}` : '';
+  return apiFetch(`${formBase(workspaceId, projectId)}/${formId}/submissions${qs}`);
+};
+
+export const approveSubmission = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  submissionId: string,
+): Promise<ApiResponse<{ task_id: string; submission_id: string }>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}/submissions/${submissionId}/approve`, {
+    method: 'POST',
+    body: '{}',
+  });
+
+export const rejectSubmission = (
+  workspaceId: string,
+  projectId: string,
+  formId: string,
+  submissionId: string,
+): Promise<ApiResponse<{ message: string }>> =>
+  apiFetch(`${formBase(workspaceId, projectId)}/${formId}/submissions/${submissionId}/reject`, {
+    method: 'POST',
+    body: '{}',
+  });

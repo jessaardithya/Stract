@@ -9,42 +9,74 @@ interface KpiCardProps {
   trend?: 'up' | 'down';
   alert?: boolean;
   badge?: 'good' | 'warning' | 'critical';
+  hint?: string;
 }
 
 export function KpiCard({
-  label, value, icon: Icon, suffix, trend, alert, badge
+  label,
+  value,
+  icon: Icon,
+  suffix,
+  trend,
+  alert,
+  badge,
+  hint,
 }: KpiCardProps) {
   const badgeColors = {
-    good: 'bg-emerald-100 text-emerald-800',
-    warning: 'bg-amber-100 text-amber-800',
-    critical: 'bg-red-100 text-red-800',
+    good: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    critical: 'border-red-200 bg-red-50 text-red-700',
   };
 
+  const iconColor = alert ? 'text-red-500' : 'text-violet-600';
+
   return (
-    <div className={`bg-white rounded-xl border p-5 transition-colors ${alert ? 'border-red-300 bg-red-50' : 'border-[#e4e4e0] hover:border-violet-200'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-400">{label}</h3>
-        <Icon className={`w-5 h-5 ${alert ? 'text-red-500' : 'text-gray-400'}`} />
-      </div>
-      
-      <div className="flex items-baseline gap-2">
-        <span className={`text-3xl font-semibold tracking-tight ${alert ? 'text-red-900' : 'text-gray-900'}`}>
-          {value}
+    <div
+      className={`flex h-full flex-col justify-between border px-5 py-5 transition-colors ${
+        alert ? 'border-red-200 bg-red-50/60' : 'border-[#e4e4e0] bg-white'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a8a85]">{label}</p>
+          {hint && <p className="mt-2 max-w-[18rem] text-sm leading-6 text-[#706b64]">{hint}</p>}
+        </div>
+        <span className="flex h-10 w-10 items-center justify-center border border-black/[0.06] bg-[#f7f4ee]">
+          <Icon className={`h-4 w-4 ${iconColor}`} />
         </span>
-        {suffix && <span className="text-sm font-medium text-gray-500">{suffix}</span>}
       </div>
 
-      {(trend || badge) && (
-        <div className="mt-4 flex items-center gap-2">
-          {trend === 'up' && <TrendingUp className="w-4 h-4 text-emerald-500" />}
-          {trend === 'down' && <TrendingDown className="w-4 h-4 text-rose-500" />}
-          {badge && (
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[badge]}`}>
-              {badge.charAt(0).toUpperCase() + badge.slice(1)}
-            </span>
-          )}
+      <div className="mt-8 flex items-end justify-between gap-4">
+        <div className="flex items-end gap-2">
+          <span className={`text-[34px] font-semibold leading-none tracking-[-0.03em] ${alert ? 'text-red-900' : 'text-gray-950'}`}>
+            {value}
+          </span>
+          {suffix && <span className="pb-1 text-sm font-medium text-[#8a8a85]">{suffix}</span>}
         </div>
-      )}
+
+        {(trend || badge) && (
+          <div className="flex items-center gap-2">
+            {trend === 'up' && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                <TrendingUp className="h-4 w-4" />
+                Up
+              </span>
+            )}
+            {trend === 'down' && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
+                <TrendingDown className="h-4 w-4" />
+                Down
+              </span>
+            )}
+            {badge && (
+              <span className={`inline-flex items-center gap-2 border px-2.5 py-1 text-[11px] font-semibold capitalize ${badgeColors[badge]}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {badge}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -63,6 +63,7 @@ type Task struct {
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"project_id"`
 	CreatorID   string    `json:"creator_id"`
+	Creator     *Assignee `json:"creator"`
 	AssigneeID  *string   `json:"assignee_id"`
 	Assignee    *Assignee `json:"assignee"`
 	Title       string    `json:"title"`
@@ -148,11 +149,13 @@ func taskScanFull(row interface {
 	Scan(...interface{}) error
 }, t *Task) error {
 	var aID, aEmail, aName, aAvatar *string
+	var cID, cEmail, cName, cAvatar *string
 	err := row.Scan(
 		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
 		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
 		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
 		&aID, &aEmail, &aName, &aAvatar,
+		&cID, &cEmail, &cName, &cAvatar,
 		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
 	)
 	if err == nil && aID != nil && aEmail != nil {
@@ -163,6 +166,15 @@ func taskScanFull(row interface {
 			AvatarURL: aAvatar,
 		}
 	}
+if err == nil && cID != nil && cEmail != nil {
+t.Creator = &Assignee{
+ID:        *cID,
+Email:     *cEmail,
+Name:      cName,
+AvatarURL: cAvatar,
+}
+}
+
 	return err
 }
 
@@ -172,6 +184,7 @@ SELECT t.id, t.project_id, t.creator_id, t.assignee_id,
        t.start_date::text, t.due_date::text,
        COALESCE(t.last_moved_at::text,''), t.created_at::text, t.updated_at::text,
        u.id, u.email, u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'avatar_url',
+       c.id, c.email, c.raw_user_meta_data->>'full_name', c.raw_user_meta_data->>'avatar_url',
        ps.id, ps.name, ps.color, ps.position`
 
 // ListTasks handles GET requests to retrieve tasks (legacy / backward compat).
@@ -184,6 +197,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 
 	query := fullTaskSelect + ` FROM stract.tasks t
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.creator_id = $1 AND t.deleted_at IS NULL`
 	if hasDates := c.Query("has_dates"); hasDates != "" {
@@ -261,6 +275,7 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 
 	var updated Task
 	var aID, aEmail, aName, aAvatar *string
+	var cID, cEmail, cName, cAvatar *string
 	err := h.DB.QueryRow(context.Background(),
 		`WITH upd AS (
 			UPDATE stract.tasks SET
@@ -276,6 +291,7 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 			          COALESCE(last_moved_at::text,''), created_at::text, updated_at::text
 		)
 		SELECT upd.*, u.id, u.email, u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'avatar_url',
+       c.id, c.email, c.raw_user_meta_data->>'full_name', c.raw_user_meta_data->>'avatar_url',
 		       ps.id, ps.name, ps.color, ps.position
 		FROM upd
 		LEFT JOIN auth.users u ON u.id = upd.assignee_id
@@ -286,6 +302,7 @@ func (h *Handler) LegacyUpdateTask(c *gin.Context) {
 		&updated.Title, &updated.Description, &updated.StatusID, &updated.Priority, &updated.Label, &updated.Position,
 		&updated.StartDate, &updated.DueDate, &updated.LastMovedAt, &updated.CreatedAt, &updated.UpdatedAt,
 		&aID, &aEmail, &aName, &aAvatar,
+		&cID, &cEmail, &cName, &cAvatar,
 		&updated.Status.ID, &updated.Status.Name, &updated.Status.Color, &updated.Status.Position,
 	)
 	if err != nil {
@@ -351,6 +368,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 
 	var insertedTask Task
 	var aID, aEmail, aName, aAvatar *string
+	var cID, cEmail, cName, cAvatar *string
 	err = h.DB.QueryRow(context.Background(),
 		`WITH ins AS (
 			INSERT INTO stract.tasks (title, description, status, status_id, position, creator_id, priority, label, due_date, start_date, assignee_id, project_id)
@@ -361,6 +379,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 			          COALESCE(last_moved_at::text,''), created_at::text, updated_at::text
 		)
 		SELECT ins.*, u.id, u.email, u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'avatar_url',
+       c.id, c.email, c.raw_user_meta_data->>'full_name', c.raw_user_meta_data->>'avatar_url',
 		       ps.id, ps.name, ps.color, ps.position
 		FROM ins
 		LEFT JOIN auth.users u ON u.id = ins.assignee_id
@@ -372,6 +391,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 		&insertedTask.Title, &insertedTask.Description, &insertedTask.StatusID, &insertedTask.Priority, &insertedTask.Label, &insertedTask.Position,
 		&insertedTask.StartDate, &insertedTask.DueDate, &insertedTask.LastMovedAt, &insertedTask.CreatedAt, &insertedTask.UpdatedAt,
 		&aID, &aEmail, &aName, &aAvatar,
+		&cID, &cEmail, &cName, &cAvatar,
 		&insertedTask.Status.ID, &insertedTask.Status.Name, &insertedTask.Status.Color, &insertedTask.Status.Position,
 	)
 	if err != nil {

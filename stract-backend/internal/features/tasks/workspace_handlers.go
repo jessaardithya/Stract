@@ -38,6 +38,7 @@ func (h *Handler) WorkspaceListTasks(c *gin.Context) {
 
 	query := fullTaskSelect + ` FROM stract.tasks t
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.project_id = $1 AND t.deleted_at IS NULL`
 	args := []interface{}{projectID}
@@ -110,6 +111,7 @@ func (h *Handler) WorkspaceGetTask(c *gin.Context) {
 		fullTaskSelect+` FROM stract.tasks t
 		 JOIN stract.projects p ON p.id = t.project_id
 		 LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		 JOIN stract.project_statuses ps ON ps.id = t.status_id
 		 WHERE t.id = $1 AND p.workspace_id = $2 AND t.deleted_at IS NULL`,
 		id, workspaceID,
@@ -222,7 +224,6 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 	}
 
 	var t Task
-	var aID, aEmail, aName, aAvatar *string
 	row := h.DB.QueryRow(context.Background(),
 		`WITH updated AS (
 		  UPDATE stract.tasks SET
@@ -241,24 +242,16 @@ func (h *Handler) WorkspaceUpdateTask(c *gin.Context) {
 		)
 		`+fullTaskSelect+` FROM updated t 
 		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
 		req.Title, req.Description, req.StatusID, progressStatus, req.Priority, req.Label,
 		req.DueDate, req.StartDate, req.AssigneeID,
 		id,
 	)
-	if err := row.Scan(
-		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
-		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
-		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
-		&aID, &aEmail, &aName, &aAvatar,
-		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
-	); err != nil {
+	if err := taskScanFull(row, &t); err != nil {
 		log.Printf("[ws-tasks] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task"})
 		return
-	}
-	if aID != nil && aEmail != nil {
-		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	action := "updated"
@@ -323,7 +316,6 @@ func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
 	).Scan(&nextPosition)
 
 	var t Task
-	var aID, aEmail, aName, aAvatar *string
 	row := h.DB.QueryRow(context.Background(),
 		`WITH inserted AS (
 		  INSERT INTO stract.tasks (title, description, status, status_id, position, creator_id, project_id, priority, label, due_date, start_date, assignee_id)
@@ -332,23 +324,15 @@ func (h *Handler) WorkspaceCreateTask(c *gin.Context) {
 		)
 		`+fullTaskSelect+` FROM inserted t 
 		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
 		req.Title, req.Description, progressStatus, req.StatusID, nextPosition, userID, req.ProjectID, priority,
 		req.Label, req.DueDate, req.StartDate, req.AssigneeID,
 	)
-	if err := row.Scan(
-		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
-		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
-		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
-		&aID, &aEmail, &aName, &aAvatar,
-		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
-	); err != nil {
+	if err := taskScanFull(row, &t); err != nil {
 		log.Printf("[ws-tasks] create error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create task"})
 		return
-	}
-	if aID != nil && aEmail != nil {
-		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	events.Emit(events.TaskEvent{
@@ -414,7 +398,6 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 	newPos := (req.PrevPos + nextPos) / 2.0
 
 	var t Task
-	var aID, aEmail, aName, aAvatar *string
 	row := h.DB.QueryRow(context.Background(),
 		`WITH upd AS (
 		  UPDATE stract.tasks
@@ -424,22 +407,14 @@ func (h *Handler) WorkspaceUpdateTaskPosition(c *gin.Context) {
 		)
 		`+fullTaskSelect+` FROM upd t
 		LEFT JOIN auth.users u ON u.id = t.assignee_id
+		 LEFT JOIN auth.users c ON c.id = t.creator_id
 		JOIN stract.project_statuses ps ON ps.id = t.status_id`,
 		newPos, req.StatusID, progressStatus, id,
 	)
-	if err := row.Scan(
-		&t.ID, &t.ProjectID, &t.CreatorID, &t.AssigneeID,
-		&t.Title, &t.Description, &t.StatusID, &t.Priority, &t.Label, &t.Position,
-		&t.StartDate, &t.DueDate, &t.LastMovedAt, &t.CreatedAt, &t.UpdatedAt,
-		&aID, &aEmail, &aName, &aAvatar,
-		&t.Status.ID, &t.Status.Name, &t.Status.Color, &t.Status.Position,
-	); err != nil {
+	if err := taskScanFull(row, &t); err != nil {
 		log.Printf("[ws-tasks] position update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task position"})
 		return
-	}
-	if aID != nil && aEmail != nil {
-		t.Assignee = &Assignee{ID: *aID, Email: *aEmail, Name: aName, AvatarURL: aAvatar}
 	}
 
 	var newStatusName string

@@ -6,68 +6,64 @@ interface Props {
 
 export function ProjectsSummaryTable({ projects }: Props) {
   return (
-    <div className="bg-white rounded-xl border border-[#e4e4e0] mt-8 overflow-hidden">
-      <div className="p-6 border-b border-[#e4e4e0]">
-        <h3 className="text-lg font-medium text-gray-900">Projects Overview</h3>
-        <p className="text-sm text-gray-500 mt-1">Completion breakdown per project</p>
+    <div className="overflow-hidden border border-[#e4e4e0] bg-white">
+      <div className="grid grid-cols-[minmax(220px,1.3fr)_120px_120px_180px_minmax(180px,1fr)] gap-0 border-b border-[#e4e4e0] bg-[#f7f4ee] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8a8a85]">
+        <span>Project</span>
+        <span>Total tasks</span>
+        <span>Completed</span>
+        <span>Completion rate</span>
+        <span>Progress</span>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#fafaf8] border-b border-[#e4e4e0] text-sm font-medium text-gray-500">
-              <th className="px-6 py-4">Project</th>
-              <th className="px-6 py-4">Total tasks</th>
-              <th className="px-6 py-4">Completed</th>
-              <th className="px-6 py-4">Completion Rate</th>
-              <th className="px-6 py-4 w-1/4">Progress</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#e4e4e0]">
-            {projects.map((p, idx) => {
-              const rateColor = 
-                p.completion_rate >= 75 ? 'text-emerald-600' :
-                p.completion_rate >= 40 ? 'text-amber-600' : 'text-red-600';
+      <div className="divide-y divide-[#e4e4e0]">
+        {projects.map((project) => {
+          const rateColor =
+            project.completion_rate >= 75
+              ? 'text-emerald-600'
+              : project.completion_rate >= 40
+                ? 'text-amber-600'
+                : 'text-rose-600';
 
-              return (
-                <tr key={p.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#fafaf8]/50'}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: p.color }}
-                      ></span>
-                      <span className="font-medium text-gray-900">{p.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{p.total}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">{p.completed}</td>
-                  <td className={`px-6 py-4 whitespace-nowrap font-medium ${rateColor}`}>
-                    {p.completion_rate.toFixed(1)}%
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${p.completion_rate}%`,
-                          backgroundColor: p.color
-                        }}
-                      ></div>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {projects.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">
-                  No projects available in this workspace.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          return (
+            <div
+              key={project.id}
+              className="grid grid-cols-1 gap-4 px-5 py-4 text-sm text-[#5d5a54] md:grid-cols-[minmax(220px,1.3fr)_120px_120px_180px_minmax(180px,1fr)] md:items-center"
+            >
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-950">{project.name}</p>
+                  <p className="mt-0.5 text-xs text-[#8a8a85]">Project delivery snapshot</p>
+                </div>
+              </div>
+
+              <span>{project.total}</span>
+              <span>{project.completed}</span>
+              <span className={`font-semibold ${rateColor}`}>{project.completion_rate.toFixed(1)}%</span>
+
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-full overflow-hidden bg-[#ede8dc]">
+                  <div
+                    className="h-full transition-all duration-500"
+                    style={{
+                      width: `${project.completion_rate}%`,
+                      backgroundColor: project.color,
+                    }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right text-xs text-[#8a8a85]">
+                  {Math.round(project.completion_rate)}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+
+        {projects.length === 0 && (
+          <div className="px-5 py-10 text-center text-sm text-[#8a8a85]">
+            No projects available in this workspace.
+          </div>
+        )}
       </div>
     </div>
   );

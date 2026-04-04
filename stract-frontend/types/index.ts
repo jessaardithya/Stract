@@ -84,6 +84,7 @@ export interface Task {
   updated_at: string;
   deleted_at: string | null;
   assignee: WorkspaceMember | null;
+  creator: User | null;
   subtask_counts: {
     total: number;
     completed: number;
@@ -128,6 +129,13 @@ export interface PendingInvitation {
   workspace_name: string;
   workspace_color: string;
   invited_by_name: string;
+  expires_at: string;
+}
+
+export interface CreatedInvitation {
+  token: string;
+  workspace_id: string;
+  invited_email: string;
   expires_at: string;
 }
 
@@ -247,3 +255,119 @@ export type BootState =
   | 'ready';
 
 export type DueDateStatus = 'none' | 'overdue' | 'today' | 'upcoming';
+
+// Meetings
+export interface MeetingAttendee {
+  user_id: string | null;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  is_external: boolean;
+}
+
+export interface MeetingActionItem {
+  id: string;
+  meeting_id: string;
+  title: string;
+  is_done: boolean;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  assignee_avatar: string | null;
+  due_date: string | null;
+  converted_task_id: string | null;
+  created_at: string;
+}
+
+export interface MeetingNote {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  creator_id: string;
+  title: string;
+  meeting_date: string;
+  location: string | null;
+  attendees: MeetingAttendee[];
+  agenda: string | null;
+  notes: string | null;
+  decisions: string | null;
+  action_items: MeetingActionItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingListItem {
+  id: string;
+  title: string;
+  meeting_date: string;
+  creator_id: string;
+  attendee_count: number;
+  action_item_count: number;
+  created_at: string;
+}
+
+// Forms (Phase 13B)
+export type FieldType = 'text' | 'textarea' | 'select' | 'email' | 'date' | 'priority';
+
+export interface FormField {
+  id: string;
+  form_id: string;
+  label: string;
+  field_type: FieldType;
+  placeholder: string | null;
+  options: string[] | null;
+  is_required: boolean;
+  position: number;
+  created_at: string;
+}
+
+export interface ProjectForm {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  creator_id: string;
+  title: string;
+  description: string | null;
+  is_public: boolean;
+  auto_create: boolean;
+  slug: string;
+  default_status_id: string | null;
+  default_priority: Priority;
+  is_active: boolean;
+  fields: FormField[];
+  submission_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormListItem {
+  id: string;
+  title: string;
+  description: string | null;
+  is_public: boolean;
+  auto_create: boolean;
+  is_active: boolean;
+  slug: string;
+  submission_count: number;
+  pending_count: number;
+  created_at: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  form_id: string;
+  project_id: string;
+  submitted_by: string | null;
+  submitter_name: string | null;
+  submitter_email: string | null;
+  answers: Record<string, string>;
+  status: 'pending' | 'approved' | 'rejected';
+  task_id: string | null;
+  created_at: string;
+}
+
+export interface PublicFormData {
+  title: string;
+  description: string | null;
+  is_public: boolean;
+  fields: FormField[];
+}

@@ -1,0 +1,1 @@
+GetFileAttributesEx test_inv.go: The system cannot find the file specified.
