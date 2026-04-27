@@ -4,6 +4,7 @@ import { useState, useReducer, useEffect, useCallback, useRef } from "react";
 import { CalendarDays, Columns3, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import ApplyTaskTemplate from "@/components/templates/ApplyTaskTemplate";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import Column from "./Column";
@@ -16,7 +17,7 @@ import {
 import { useRealtime } from "@/hooks/useRealtime";
 import { useApp } from "@/context/AppContext";
 import { useStatuses } from "@/context/StatusContext";
-import type { Task } from "@/types";
+import type { Project, Task } from "@/types";
 
 type BoardState = {
   tasks: Task[];
@@ -268,7 +269,7 @@ export default function Board() {
         }, 500);
       }
     },
-    [state.tasks, activeWorkspace?.id, statuses],
+    [state.tasks, activeWorkspace?.id, statuses, refreshProjects],
   );
 
   const scheduledCount = state.tasks.filter((task) => task.start_date || task.due_date).length;
@@ -300,6 +301,9 @@ export default function Board() {
             columnCount={0} 
             scheduledCount={scheduledCount} 
             taskCount={state.tasks.length} 
+            workspaceId={activeWorkspace?.id ?? null}
+            projectId={activeProject?.id ?? null}
+            onTaskApplied={handleTaskAdded}
           />
         )}
         <section className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-[#d8d1c5] bg-[#fbfaf7]/50 py-20 shadow-[0_18px_40px_-32px_rgba(28,24,17,0.1)]">
@@ -347,6 +351,9 @@ export default function Board() {
           columnCount={statuses.length} 
           scheduledCount={scheduledCount} 
           taskCount={state.tasks.length} 
+          workspaceId={activeWorkspace?.id ?? null}
+          projectId={activeProject?.id ?? null}
+          onTaskApplied={handleTaskAdded}
         />
       )}
 
@@ -399,11 +406,22 @@ export default function Board() {
   );
 }
 
-function BoardHeader({ project, columnCount, scheduledCount, taskCount }: { 
-  project: any, 
-  columnCount: number, 
-  scheduledCount: number, 
-  taskCount: number 
+function BoardHeader({
+  project,
+  columnCount,
+  scheduledCount,
+  taskCount,
+  workspaceId,
+  projectId,
+  onTaskApplied,
+}: {
+  project: Project,
+  columnCount: number,
+  scheduledCount: number,
+  taskCount: number,
+  workspaceId: string | null,
+  projectId: string | null,
+  onTaskApplied: (task: Task) => void,
 }) {
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-[#e7e2d8] bg-[#fbfaf7] px-5 py-5 shadow-[0_18px_40px_-32px_rgba(28,24,17,0.22)] md:flex-row md:items-end md:justify-between">
@@ -426,6 +444,13 @@ function BoardHeader({ project, columnCount, scheduledCount, taskCount }: {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {workspaceId && projectId ? (
+          <ApplyTaskTemplate
+            workspaceId={workspaceId}
+            projectId={projectId}
+            onApplied={onTaskApplied}
+          />
+        ) : null}
         <span className="inline-flex items-center gap-2 rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
           <Columns3 className="h-3.5 w-3.5" />
           {columnCount} column{columnCount === 1 ? "" : "s"}

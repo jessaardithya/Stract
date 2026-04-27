@@ -12,12 +12,19 @@ import type {
   MeetingNote,
   PendingInvitation,
   Priority,
+  ProjectTemplate,
+  ProjectTemplateListItem,
+  ProjectTemplateStatus,
+  ProjectTemplateTask,
   ProjectForm,
   PublicFormData,
   Project,
   ProjectStatus,
+  ChecklistItem,
   Subtask,
   Task,
+  TaskTemplate,
+  TaskTemplateListItem,
   UserActivity,
   Workspace,
   WorkspaceMember,
@@ -93,6 +100,186 @@ export const createInvitation = (
   apiFetch(`/api/v1/workspaces/${workspaceId}/invitations`, {
     method: 'POST',
     body: JSON.stringify(data ?? {}),
+  });
+
+// Templates
+export const getProjectTemplates = (workspaceId: string): Promise<ApiResponse<ProjectTemplateListItem[]>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects`);
+
+export const createProjectTemplate = (
+  workspaceId: string,
+  data: { name: string; description?: string | null; color?: string }
+): Promise<ApiResponse<ProjectTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const getProjectTemplate = (
+  workspaceId: string,
+  templateId: string
+): Promise<ApiResponse<ProjectTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}`);
+
+export const updateProjectTemplate = (
+  workspaceId: string,
+  templateId: string,
+  data: Partial<Pick<ProjectTemplate, 'name' | 'description' | 'color'>>
+): Promise<ApiResponse<ProjectTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteProjectTemplate = (workspaceId: string, templateId: string): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}`, {
+    method: 'DELETE',
+  });
+
+export const addTemplateStatus = (
+  workspaceId: string,
+  templateId: string,
+  data: Pick<ProjectTemplateStatus, 'name' | 'color'>
+): Promise<ApiResponse<ProjectTemplateStatus>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/statuses`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateTemplateStatus = (
+  workspaceId: string,
+  templateId: string,
+  statusId: string,
+  data: Partial<Pick<ProjectTemplateStatus, 'name' | 'color' | 'position'>>
+): Promise<ApiResponse<ProjectTemplateStatus>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/statuses/${statusId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteTemplateStatus = (
+  workspaceId: string,
+  templateId: string,
+  statusId: string
+): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/statuses/${statusId}`, {
+    method: 'DELETE',
+  });
+
+export const addTemplateTask = (
+  workspaceId: string,
+  templateId: string,
+  data: {
+    title: string;
+    description?: string | null;
+    priority?: Priority;
+    status_id?: string | null;
+    position?: number;
+  }
+): Promise<ApiResponse<ProjectTemplateTask>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateTemplateTask = (
+  workspaceId: string,
+  templateId: string,
+  taskId: string,
+  data: Partial<{
+    title: string;
+    description: string | null;
+    priority: Priority;
+    status_id: string | null;
+    position: number;
+  }>
+): Promise<ApiResponse<ProjectTemplateTask>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/tasks/${taskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteTemplateTask = (
+  workspaceId: string,
+  templateId: string,
+  taskId: string
+): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/tasks/${taskId}`, {
+    method: 'DELETE',
+  });
+
+export const applyProjectTemplate = (
+  workspaceId: string,
+  templateId: string,
+  data: { name: string; color?: string }
+): Promise<ApiResponse<Project>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/projects/${templateId}/apply`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const getTaskTemplates = (workspaceId: string): Promise<ApiResponse<TaskTemplateListItem[]>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks`);
+
+export const createTaskTemplate = (
+  workspaceId: string,
+  data: {
+    name: string;
+    description?: string | null;
+    title: string;
+    task_description?: string | null;
+    priority?: Priority;
+    label?: string | null;
+    checklist?: ChecklistItem[];
+  }
+): Promise<ApiResponse<TaskTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const getTaskTemplate = (
+  workspaceId: string,
+  templateId: string
+): Promise<ApiResponse<TaskTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks/${templateId}`);
+
+export const updateTaskTemplate = (
+  workspaceId: string,
+  templateId: string,
+  data: Partial<{
+    name: string;
+    description: string | null;
+    title: string;
+    task_description: string | null;
+    priority: Priority;
+    label: string | null;
+    checklist: ChecklistItem[];
+  }>
+): Promise<ApiResponse<TaskTemplate>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks/${templateId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteTaskTemplate = (workspaceId: string, templateId: string): Promise<void> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks/${templateId}`, {
+    method: 'DELETE',
+  });
+
+export const applyTaskTemplate = (
+  workspaceId: string,
+  templateId: string,
+  data: {
+    project_id: string;
+    status_id: string;
+    assignee_id?: string | null;
+    due_date?: string | null;
+  }
+): Promise<ApiResponse<Task>> =>
+  apiFetch(`/api/v1/workspaces/${workspaceId}/templates/tasks/${templateId}/apply`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 
 // Projects
