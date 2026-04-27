@@ -152,6 +152,80 @@ export interface UserActivity {
   created_at: string;
 }
 
+export interface ProjectTemplateStatus {
+  id: string;
+  template_id: string;
+  name: string;
+  color: string;
+  position: number;
+}
+
+export interface ProjectTemplateTask {
+  id: string;
+  template_id: string;
+  status_id: string | null;
+  status_name: string | null;
+  status_color: string | null;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  position: number;
+}
+
+export interface ProjectTemplate {
+  id: string;
+  workspace_id: string;
+  creator_id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  statuses: ProjectTemplateStatus[];
+  tasks: ProjectTemplateTask[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectTemplateListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  status_count: number;
+  task_count: number;
+  creator_id: string;
+  created_at: string;
+}
+
+export interface ChecklistItem {
+  title: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  workspace_id: string;
+  creator_id: string;
+  name: string;
+  description: string | null;
+  title: string;
+  task_description: string | null;
+  priority: Priority;
+  label: string | null;
+  checklist: ChecklistItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskTemplateListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  title: string;
+  priority: Priority;
+  label: string | null;
+  checklist_count: number;
+  created_at: string;
+}
+
 // Analytics
 export interface AnalyticsSummary {
   project_id: string;

@@ -49,20 +49,24 @@
     ChevronRight,
     CalendarDays,
     CalendarRange,
+    LayoutTemplate,
     NotebookText,
     FileInput,
   } from "lucide-react";
+  import ApplyProjectTemplate from "@/components/templates/ApplyProjectTemplate";
   import { useApp } from "@/context/AppContext";
   import {
     createProject,
     createWorkspace,
+    getProjectTemplate,
+    getProjectTemplates,
     updateProject,
     deleteProject,
     updateWorkspace,
     deleteWorkspace,
   } from "@/lib/api";
   import { deriveSlug } from "@/utils/slug";
-  import type { Workspace, Project } from "@/types";
+  import type { Workspace, Project, ProjectTemplate, ProjectTemplateListItem } from "@/types";
 
   const PRESET_COLORS = [
     "#6366f1",
@@ -83,6 +87,7 @@
   const BOTTOM_NAV = [
     { href: "/home", label: "Home", Icon: House },
     { href: "/dashboard", label: "Reports", Icon: BarChart2 },
+    { href: "/templates", label: "Templates", Icon: LayoutTemplate },
     { href: "/settings", label: "Settings", Icon: Settings },
   ];
 
@@ -103,10 +108,16 @@
 
     // Project form (Creation)
     const [showNewProject, setShowNewProject] = useState<boolean>(false);
+    const [newProjectMode, setNewProjectMode] = useState<"menu" | "blank">("menu");
     const [newProjectName, setNewProjectName] = useState<string>("");
     const [newProjectDescription, setNewProjectDescription] = useState<string>("");
     const [newProjectColor, setNewProjectColor] = useState<string>(PRESET_COLORS[0]);
     const [isCreating, setIsCreating] = useState<boolean>(false);
+    const [projectTemplatesOpen, setProjectTemplatesOpen] = useState<boolean>(false);
+    const [projectTemplatesLoading, setProjectTemplatesLoading] = useState<boolean>(false);
+    const [projectTemplates, setProjectTemplates] = useState<ProjectTemplateListItem[]>([]);
+    const [selectedProjectTemplate, setSelectedProjectTemplate] = useState<ProjectTemplate | null>(null);
+    const [applyProjectTemplateOpen, setApplyProjectTemplateOpen] = useState<boolean>(false);
 
     // Project Settings (Edit/Delete)
     const [projectSettingsOpen, setProjectSettingsOpen] = useState<boolean>(false);
@@ -201,6 +212,7 @@
     useEffect(() => {
       if (activeWorkspace && projects.length === 0) {
         setShowNewProject(true);
+        setNewProjectMode("menu");
       }
     }, [activeWorkspace, projects.length]);
 
@@ -385,6 +397,7 @@
         await refreshProjects();
         setActiveProject(result.data);
         setShowNewProject(false);
+        setNewProjectMode("menu");
         setNewProjectName("");
         setNewProjectDescription("");
         setNewProjectColor(PRESET_COLORS[0]);
@@ -401,8 +414,39 @@
       if (e.key === "Enter") handleCreateProject();
       if (e.key === "Escape" && projects.length > 0) {
         setShowNewProject(false);
+        setNewProjectMode("menu");
         setNewProjectName("");
         setNewProjectDescription("");
+      }
+    };
+
+    const handleOpenProjectTemplates = async () => {
+      if (!activeWorkspace?.id) return;
+      setProjectTemplatesOpen(true);
+      setProjectTemplatesLoading(true);
+      try {
+        const result = await getProjectTemplates(activeWorkspace.id);
+        setProjectTemplates(result.data || []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("[Sidebar] load project templates error:", message);
+      } finally {
+        setProjectTemplatesLoading(false);
+      }
+    };
+
+    const handleChooseProjectTemplate = async (templateId: string) => {
+      if (!activeWorkspace?.id) return;
+      try {
+        const result = await getProjectTemplate(activeWorkspace.id, templateId);
+        setSelectedProjectTemplate(result.data);
+        setProjectTemplatesOpen(false);
+        setApplyProjectTemplateOpen(true);
+        setShowNewProject(false);
+        setNewProjectMode("menu");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("[Sidebar] load project template error:", message);
       }
     };
 
@@ -720,6 +764,25 @@
             {showNewProject && !isCollapsed ? (
               <div className="mt-3 border-t border-[#e7e1d8] pt-3">
                 <div className="space-y-2 px-1">
+                  {newProjectMode === "menu" ? (
+                    <>
+                      <button
+                        onClick={() => setNewProjectMode("blank")}
+                        className="flex w-full items-center justify-between rounded-xl border border-[#ddd7cd] bg-white/85 px-3 py-3 text-left text-[12px] text-[#4f4a43] transition-colors hover:border-[#cfc5b6] hover:bg-white"
+                      >
+                        <span className="font-medium">Blank project</span>
+                        <ChevronRight size={12} className="text-[#8a8a85]" />
+                      </button>
+                      <button
+                        onClick={() => void handleOpenProjectTemplates()}
+                        className="flex w-full items-center justify-between rounded-xl border border-[#ddd7cd] bg-white/85 px-3 py-3 text-left text-[12px] text-[#4f4a43] transition-colors hover:border-[#cfc5b6] hover:bg-white"
+                      >
+                        <span className="font-medium">From template</span>
+                        <ChevronRight size={12} className="text-[#8a8a85]" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
                 <Input
                   autoFocus
                   value={newProjectName}
@@ -769,12 +832,21 @@
                     )}
                     {isCreating ? "Creating…" : "Create"}
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewProjectMode("menu")}
+                    className="h-7 px-2 text-[11px] text-[#8a8a85]"
+                  >
+                    Back
+                  </Button>
                   {projects.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setShowNewProject(false);
+                        setNewProjectMode("menu");
                         setNewProjectName("");
                         setNewProjectDescription("");
                       }}
@@ -789,6 +861,8 @@
                     Start with one project. You can add more later.
                   </p>
                 )}
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -796,6 +870,7 @@
                 onClick={() => {
                   if (isCollapsed) setIsCollapsed(false);
                   setShowNewProject(true);
+                  setNewProjectMode("menu");
                 }}
                 className={`mt-3 flex items-center text-[#5d5a54] transition-colors hover:bg-white/55 hover:text-gray-950 ${
                   isCollapsed
@@ -933,6 +1008,59 @@
             </Popover>
           </div>
         </aside>
+
+        <Dialog open={projectTemplatesOpen} onOpenChange={setProjectTemplatesOpen}>
+          <DialogContent className="border-[#e4e4e0] bg-[#fffdf9] sm:max-w-[560px]">
+            <DialogHeader>
+              <DialogTitle>Create project from template</DialogTitle>
+            </DialogHeader>
+            <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto">
+              {projectTemplatesLoading ? (
+                <p className="text-sm text-[#746d62]">Loading templates…</p>
+              ) : projectTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#d9d2c6] bg-[#fbfaf7] px-4 py-10 text-sm text-[#746d62]">
+                  No project templates yet.
+                </div>
+              ) : (
+                projectTemplates.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void handleChooseProjectTemplate(item.id)}
+                    className="rounded-xl border border-[#e4e4e0] bg-white px-4 py-4 text-left transition-colors hover:border-[#d4cfc4] hover:bg-[#fffaf3]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <p className="truncate text-sm font-semibold text-[#1f1b17]">{item.name}</p>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[#746d62]">
+                          {item.description?.trim() || "Reusable setup for a new project."}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#ece5d8] bg-[#faf7f1] px-2 py-1 text-[11px] text-[#8f877a]">
+                        {item.task_count} tasks
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <ApplyProjectTemplate
+          workspaceId={activeWorkspace?.id ?? ""}
+          template={selectedProjectTemplate}
+          open={applyProjectTemplateOpen}
+          onOpenChange={setApplyProjectTemplateOpen}
+          onApplied={async (project) => {
+            await refreshProjects();
+            setActiveProject(project);
+            router.push("/");
+          }}
+        />
 
         {/* New Workspace Dialog */}
         <Dialog

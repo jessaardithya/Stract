@@ -45,6 +45,7 @@ import {
 import TaskListPanel from "@/components/timeline/TaskListPanel";
 import TimelineGrid from "@/components/timeline/TimelineGrid";
 import TimelineUnscheduled from "@/components/timeline/TimelineUnscheduled";
+import ApplyTaskTemplate from "@/components/templates/ApplyTaskTemplate";
 
 const ZOOM_OPTIONS: { value: TimelineZoom; label: string }[] = [
   { value: "week", label: "Week" },
@@ -473,6 +474,19 @@ export default function TimelineView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {activeWorkspace?.id && activeProject?.id ? (
+            <ApplyTaskTemplate
+              workspaceId={activeWorkspace.id}
+              projectId={activeProject.id}
+              onApplied={(task) => {
+                if (hasTimelineDates(task)) {
+                  setScheduledTasks((current) => [...current, task]);
+                } else {
+                  setUnscheduledTasks((current) => [...current, task]);
+                }
+              }}
+            />
+          ) : null}
           <span className="inline-flex items-center gap-2 rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
             <CalendarRange className="h-3.5 w-3.5" />
             {scheduledTasks.length} scheduled task{scheduledTasks.length === 1 ? "" : "s"}

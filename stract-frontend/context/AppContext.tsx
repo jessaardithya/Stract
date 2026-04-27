@@ -23,6 +23,7 @@ interface AppContextValue {
   setActiveProject: (project: Project) => void;
   addWorkspace: (workspace: Workspace) => Promise<void>;
   appendWorkspace: (workspace: Workspace) => void;
+  appendProject: (project: Project) => void;
   refreshWorkspaces: () => Promise<Workspace[]>;
   refreshProjects: () => Promise<void>;
   openTask: (taskId: string) => void;
@@ -179,6 +180,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem(ACTIVE_PROJECT_ID_KEY, project.id);
   }, []);
 
+  const appendProject = useCallback((project: Project) => {
+    setProjects((prev) => {
+      if (prev.some((item) => item.id === project.id)) {
+        return prev.map((item) => (item.id === project.id ? { ...item, ...project } : item));
+      }
+      return [...prev, project];
+    });
+  }, []);
+
   const refreshProjects = useCallback(async () => {
     if (!activeWorkspace) {
       return;
@@ -200,6 +210,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         setActiveProject,
         addWorkspace,
         appendWorkspace,
+        appendProject,
         refreshWorkspaces,
         refreshProjects,
         openTask,

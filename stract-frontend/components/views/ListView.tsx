@@ -13,6 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import ApplyTaskTemplate from '@/components/templates/ApplyTaskTemplate';
 import type { Task } from '@/types';
 
 const PRIORITY_CFG: Record<string, { label: string; dot: string }> = {
@@ -252,6 +253,13 @@ export default function ListView() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {activeWorkspace?.id && activeProject?.id ? (
+            <ApplyTaskTemplate
+              workspaceId={activeWorkspace.id}
+              projectId={activeProject.id}
+              onApplied={(task) => setTasks((current) => [...current, task])}
+            />
+          ) : null}
           <span className="rounded-full border border-[#e6dfd2] bg-white px-3 py-1.5 text-xs font-medium text-[#5e564a]">
             {tasks.length} task{tasks.length === 1 ? '' : 's'}
           </span>

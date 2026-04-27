@@ -28,6 +28,7 @@ import (
 	"stract-backend/internal/features/statuses"
 	"stract-backend/internal/features/subtasks"
 	"stract-backend/internal/features/tasks"
+	"stract-backend/internal/features/templates"
 	"stract-backend/internal/features/users"
 	"stract-backend/internal/features/workspaces"
 )
@@ -117,6 +118,7 @@ func main() {
 	// Members & Labels under workspace
 	members.RegisterRoutes(wsGroup, db)
 	invitations.RegisterWorkspaceRoutes(wsGroup, db)
+	templates.RegisterRoutes(wsGroup.Group("/templates"), db)
 
 	// Feature: Task Details (Subtasks/Activity)
 	// These move to /api/v1/workspaces/:workspace_id/tasks/:id/...
