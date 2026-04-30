@@ -12,6 +12,7 @@ import type {
   MeetingNote,
   PendingInvitation,
   Priority,
+  ProjectAsset,
   ProjectTemplate,
   ProjectTemplateListItem,
   ProjectTemplateStatus,
@@ -684,3 +685,61 @@ export const rejectSubmission = (
     method: 'POST',
     body: '{}',
   });
+
+// ─── Assets (Phase 13D) ───────────────────────────────────────────────────────
+
+const assetBase = (workspaceId: string, projectId: string) =>
+  `/workspaces/${workspaceId}/projects/${projectId}/assets`;
+
+export const getAssets = (
+  workspaceId: string,
+  projectId: string,
+  filters?: { type?: 'link' | 'file'; pinned?: boolean },
+): Promise<ApiResponse<ProjectAsset[]>> => {
+  const params = new URLSearchParams();
+  if (filters?.type) params.set('type', filters.type);
+  if (filters?.pinned) params.set('pinned', 'true');
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`${assetBase(workspaceId, projectId)}${qs}`);
+};
+
+export const saveLink = (
+  workspaceId: string,
+  projectId: string,
+  data: { title: string; url: string; description?: string },
+): Promise<ApiResponse<ProjectAsset>> =>
+  apiFetch(assetBase(workspaceId, projectId), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const registerFile = (
+  workspaceId: string,
+  projectId: string,
+  data: { title: string; storage_path: string; file_name: string; file_size: number; mime_type: string; description?: string },
+): Promise<ApiResponse<ProjectAsset>> =>
+  apiFetch(`${assetBase(workspaceId, projectId)}/file`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateAsset = (
+  workspaceId: string,
+  projectId: string,
+  assetId: string,
+  data: Partial<{ title: string; description: string; pinned: boolean }>,
+): Promise<ApiResponse<ProjectAsset>> =>
+  apiFetch(`${assetBase(workspaceId, projectId)}/${assetId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteAsset = (
+  workspaceId: string,
+  projectId: string,
+  assetId: string,
+): Promise<ApiResponse<{ message: string }>> =>
+  apiFetch(`${assetBase(workspaceId, projectId)}/${assetId}`, { method: 'DELETE' });
+
+export const fetchUrlTitle = (url: string): Promise<{ title: string }> =>
+  apiFetch(`/utils/fetch-title?url=${encodeURIComponent(url)}`);

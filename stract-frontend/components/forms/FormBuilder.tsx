@@ -195,6 +195,7 @@ export function FormBuilder({
       {activeTab === 'fields' && (
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void handleDragEnd(e)}>
+            {/* @ts-expect-error Type mismatch with React 18 children */}
             <SortableContext items={form.fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
               {form.fields.map((field) => (
                 <SortableFieldRow

@@ -20,6 +20,7 @@ import (
 	"stract-backend/internal/core/workers"
 	"stract-backend/internal/features/activity"
 	"stract-backend/internal/features/analytics"
+	"stract-backend/internal/features/assets"
 	"stract-backend/internal/features/forms"
 	"stract-backend/internal/features/invitations"
 	"stract-backend/internal/features/meetings"
@@ -85,6 +86,11 @@ func main() {
 	invitations.RegisterRoutes(apiV1, db)
 	users.RegisterRoutes(apiV1, db)
 
+	// Utility endpoints (auth required)
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseServiceKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	apiV1.GET("/utils/fetch-title", assets.FetchURLTitle)
+
 	// ── Workspace-member-gated group ─────────────────────────────────────────────
 	wsGroup := apiV1.Group("/workspaces/:workspace_id")
 	wsGroup.Use(middleware.RequireWorkspaceMember(db))
@@ -108,6 +114,9 @@ func main() {
 
 	// Forms under project
 	forms.RegisterRoutes(projectGroup, db)
+
+	// Assets under project
+	assets.RegisterRoutes(projectGroup, db, supabaseURL, supabaseServiceKey)
 
 	// Tasks under workspace (workspace-scoped, project_id required)
 	tasks.RegisterWorkspaceRoutes(wsGroup, db)

@@ -117,6 +117,7 @@ export default function Signup() {
             Back to sign in
           </Link>
         }
+        mode="signup"
       >
         <div className="space-y-5">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100 text-violet-600">
@@ -153,76 +154,81 @@ export default function Signup() {
           </Link>
         </>
       }
+      mode="signup"
     >
       <div className="space-y-6">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full justify-center border-[#ddd7cd] bg-[#faf8f3] font-medium text-gray-800 shadow-none hover:bg-[#f3efe7]"
-          onClick={handleGoogleSignIn}
-          disabled={oauthLoading}
-        >
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[50ms] fill-mode-both">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 rounded-xl w-full justify-center border-black/10 bg-white shadow-sm transition-all hover:bg-zinc-50 hover:border-black/20 text-zinc-800 font-medium text-[14px]"
+            onClick={handleGoogleSignIn}
+            disabled={oauthLoading}
+          >
           {oauthLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleMark />}
           Continue with Google
         </Button>
-
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#e6e0d6]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a8a85]">or sign up with email</span>
-          <div className="h-px flex-1 bg-[#e6e0d6]" />
         </div>
 
-        <form onSubmit={handleEmailSignUp} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a8a85]">
+        <div className="flex items-center gap-3 animate-in fade-in duration-500 delay-[100ms] fill-mode-both">
+          <div className="h-px flex-1 bg-black/[0.06]" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a8a85]">or sign up with email</span>
+          <div className="h-px flex-1 bg-black/[0.06]" />
+        </div>
+
+        <form onSubmit={handleEmailSignUp} className="space-y-5">
+          <div className="space-y-2 group animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[150ms] fill-mode-both">
+            <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 transition-colors group-focus-within:text-violet-600">
               Email
             </Label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8a85]" />
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-violet-600" />
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="h-11 border-[#ddd7cd] bg-[#faf8f3] pl-10 shadow-none focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                className="h-12 rounded-xl text-[14px] border border-transparent bg-zinc-50/80 pl-11 shadow-none transition-all hover:bg-zinc-100 hover:border-black/5 focus-visible:bg-white focus-visible:border-violet-400 focus-visible:ring-[4px] focus-visible:ring-violet-500/10 placeholder:text-zinc-400"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2 group animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[200ms] fill-mode-both">
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a8a85]">
+              <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 transition-colors group-focus-within:text-violet-600">
                 Password
               </Label>
-              <span className="text-xs text-[#8a8a85]">At least 8 characters</span>
+              <span className="text-xs text-zinc-400">At least 8 characters</span>
             </div>
             <div className="relative">
-              <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8a85]" />
+              <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-violet-600" />
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11 border-[#ddd7cd] bg-[#faf8f3] pl-10 shadow-none focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                className="h-12 rounded-xl text-[14px] border border-transparent bg-zinc-50/80 pl-11 shadow-none transition-all hover:bg-zinc-100 hover:border-black/5 focus-visible:bg-white focus-visible:border-violet-400 focus-visible:ring-[4px] focus-visible:ring-violet-500/10"
               />
             </div>
           </div>
 
           {error && (
-            <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="border border-red-200/50 bg-red-50/50 rounded-xl px-4 py-3 text-sm text-red-600 animate-in fade-in duration-300">
               {error}
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="h-11 w-full justify-center bg-violet-600 text-white hover:bg-violet-700"
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-            {loading ? 'Creating account...' : 'Create account'}
-          </Button>
+          <div className="pt-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[250ms] fill-mode-both">
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-xl justify-center bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_8px_20px_-8px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all hover:shadow-[0_12px_24px_-10px_rgba(99,102,241,0.6)] hover:from-indigo-600 hover:to-violet-700 font-medium text-[14px]"
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              {loading ? 'Creating account...' : 'Create account'}
+            </Button>
+          </div>
         </form>
       </div>
     </AuthCard>

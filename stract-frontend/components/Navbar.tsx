@@ -3,7 +3,7 @@
   import { useState, useEffect } from "react";
   import Link from "next/link";
   import { usePathname, useRouter } from "next/navigation";
-  import { supabase } from "@/lib/supabase";
+  import { supabase, getCurrentUser } from "@/lib/supabase";
   import { Avatar, AvatarFallback } from "@/components/ui/avatar";
   import { Input } from "@/components/ui/input";
   import { Button } from "@/components/ui/button";
@@ -52,6 +52,8 @@
     LayoutTemplate,
     NotebookText,
     FileInput,
+    Paperclip,
+    User,
   } from "lucide-react";
   import ApplyProjectTemplate from "@/components/templates/ApplyProjectTemplate";
   import { useApp } from "@/context/AppContext";
@@ -64,9 +66,11 @@
     deleteProject,
     updateWorkspace,
     deleteWorkspace,
+    getMembers,
+    removeWorkspaceMember,
   } from "@/lib/api";
   import { deriveSlug } from "@/utils/slug";
-  import type { Workspace, Project, ProjectTemplate, ProjectTemplateListItem } from "@/types";
+  import type { Workspace, Project, WorkspaceMember, ProjectTemplate, ProjectTemplateListItem } from "@/types";
 
   const PRESET_COLORS = [
     "#6366f1",
@@ -233,12 +237,58 @@
     // Workspace Settings (Edit/Delete)
     const [wsSettingsOpen, setWsSettingsOpen] = useState<boolean>(false);
     const [editWsName, setEditWsName] = useState<string>("");
+    const [wsMembers, setWsMembers] = useState<WorkspaceMember[]>([]);
+    const [isLoadingMembers, setIsLoadingMembers] = useState<boolean>(false);
+    const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      if (wsSettingsOpen && activeWorkspace) {
+        setIsLoadingMembers(true);
+        Promise.all([
+          getMembers(activeWorkspace.id),
+          supabase.auth.getUser()
+        ]).then(([res, userRes]) => {
+          if (cancelled) return;
+          setWsMembers(Array.isArray(res) ? res : res.data || []);
+          setCurrentUserId(userRes.data.user?.id || null);
+        }).catch(err => {
+          if (!cancelled) console.error("Failed to fetch members", err);
+        }).finally(() => {
+          if (!cancelled) setIsLoadingMembers(false);
+        });
+      } else {
+        setWsMembers([]);
+      }
+      return () => { cancelled = true; };
+    }, [wsSettingsOpen, activeWorkspace]);
+
+    const handleRemoveMember = async (memberId: string) => {
+      if (!activeWorkspace) return;
+      setRemovingMemberId(memberId);
+      try {
+         await removeWorkspaceMember(activeWorkspace.id, memberId);
+         setWsMembers(prev => prev.filter(m => m.id !== memberId));
+      } catch (err) {
+         console.error("Failed to remove member", err);
+      } finally {
+         setRemovingMemberId(null);
+      }
+    };
     const [editWsDescription, setEditWsDescription] = useState<string>("");
     const [isUpdatingWs, setIsUpdatingWs] = useState<boolean>(false);
     const [wsDeleteAlertOpen, setWsDeleteAlertOpen] = useState<boolean>(false);
     const [wsDeleteError, setWsDeleteError] = useState<string>("");
     const [isDeletingWs, setIsDeletingWs] = useState<boolean>(false);
     const [accountOpen, setAccountOpen] = useState<boolean>(false);
+    const [currentUser, setCurrentUser] = useState<{ name: string | null; avatar_url: string | null; email: string } | null>(null);
+
+    useEffect(() => {
+      getCurrentUser().then((user) => {
+        if (user) setCurrentUser({ name: user.name, avatar_url: user.avatar_url, email: user.email });
+      }).catch(() => {});
+    }, []);
 
     const openWsSettings = (e?: React.MouseEvent) => {
       e?.stopPropagation();
@@ -747,6 +797,27 @@
                         Forms
                       </button>
                       <button
+                        onClick={() => router.push("/assets")}
+                        className={`relative w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] transition-colors ${
+                          pathname === "/assets"
+                            ? "font-medium text-gray-950"
+                            : "text-[#8a8a85] hover:text-gray-950"
+                        }`}
+                      >
+                        {pathname === "/assets" && (
+                          <span
+                            className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2"
+                            style={{ backgroundColor: p.color }}
+                          />
+                        )}
+                        <Paperclip
+                          size={13}
+                          className="shrink-0"
+                          style={pathname === "/assets" ? { color: p.color } : undefined}
+                        />
+                        Assets
+                      </button>
+                      <button
                         onClick={openProjectSettings}
                         className="w-full flex items-center gap-2 py-1.5 pr-2 pl-3 text-[12px] text-[#8a8a85] hover:text-gray-950 transition-colors"
                       >
@@ -962,18 +1033,19 @@
                   }`}
                   title={isCollapsed ? "Account actions" : undefined}
                 >
-                  <Avatar
-                    className="h-8 w-8 shrink-0 border border-black/[0.05]"
-                  >
+                  <Avatar className="h-8 w-8 shrink-0 border border-black/[0.05]">
+                    {currentUser?.avatar_url && (
+                      <img src={currentUser.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                    )}
                     <AvatarFallback className="bg-gradient-to-br from-violet-400 to-blue-400 text-white text-[11px] font-semibold">
-                      J
+                      {(currentUser?.name ?? currentUser?.email ?? 'U').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
                     <>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium leading-tight text-gray-950">
-                          Jessa
+                          {currentUser?.name ?? currentUser?.email ?? '…'}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-[#8a8a85]">
                           Free plan
@@ -993,13 +1065,21 @@
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8a8a85]">
                     Account
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-950">Jessa</p>
+                  <p className="mt-1 text-sm font-medium text-gray-950">{currentUser?.name ?? currentUser?.email ?? '…'}</p>
                   <p className="text-[11px] text-[#8a8a85]">Free plan</p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleSignOut}
+                  onClick={() => { setAccountOpen(false); router.push('/profile'); }}
                   className="mt-1 flex w-full items-center gap-2 px-2 py-2 text-sm text-[#5d5a54] transition-colors hover:bg-[#f7f4ee] hover:text-gray-950"
+                >
+                  <User size={13} className="shrink-0 text-[#8a8a85]" />
+                  Profile settings
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex w-full items-center gap-2 px-2 py-2 text-sm text-[#5d5a54] transition-colors hover:bg-[#f7f4ee] hover:text-gray-950"
                 >
                   <LogOut size={13} className="shrink-0 text-[#8a8a85]" />
                   Sign out
@@ -1600,6 +1680,54 @@
                             focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:border-violet-400
                             placeholder:text-zinc-300 transition-all"
                 />
+              </div>
+
+              {/* Members */}
+              <div>
+                <label className="text-[10px] font-bold tracking-[0.07em] uppercase text-zinc-400 block mb-1.5">
+                  Members
+                </label>
+                <div className="rounded-lg border border-black/[0.12] divide-y divide-black/[0.06] bg-zinc-50/50 max-h-48 overflow-y-auto overflow-x-hidden">
+                  {isLoadingMembers ? (
+                    <div className="p-4 text-center text-xs text-zinc-500">Loading members...</div>
+                  ) : wsMembers.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-zinc-500">No members found</div>
+                  ) : (
+                    wsMembers.map(member => {
+                      const isOwner = member.role === 'owner';
+                      const currentUserIsUser = currentUserId === member.id;
+                      const amIOwner = activeWorkspace?.owner_id === currentUserId;
+                      const canRemove = amIOwner && !isOwner && !currentUserIsUser;
+                      
+                      return (
+                        <div key={member.id} className="flex items-center justify-between p-3">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <span className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-blue-400 text-white flex items-center justify-center text-xs font-semibold shrink-0">
+                                {member.name ? member.name[0].toUpperCase() : member.email[0].toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-[13px] font-medium text-zinc-900 truncate">
+                                    {member.name || "Pending User"}
+                                    {isOwner && <span className="ml-2 text-[10px] uppercase font-bold text-violet-500 bg-violet-50 px-1.5 py-0.5 rounded">Owner</span>}
+                                </p>
+                                <p className="text-[11px] text-zinc-500 truncate">{member.email}</p>
+                            </div>
+                          </div>
+                          {canRemove && (
+                            <button
+                                type="button"
+                                onClick={() => handleRemoveMember(member.id)}
+                                disabled={removingMemberId === member.id}
+                                className="shrink-0 ml-3 h-[26px] px-2.5 rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-50"
+                            >
+                                {removingMemberId === member.id ? "Removing..." : "Remove"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               {/* Danger Zone */}

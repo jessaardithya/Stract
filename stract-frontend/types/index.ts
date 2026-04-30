@@ -4,7 +4,34 @@ export interface User {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  provider: 'email' | 'google';
 }
+
+// Assets
+export type AssetType = 'link' | 'file';
+export type SourceType = 'gdrive' | 'figma' | 'github' | 'notion' | 'generic';
+
+export interface ProjectAsset {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  creator_id: string;
+  asset_type: AssetType;
+  title: string;
+  description: string | null;
+  url: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  source_type: SourceType;
+  pinned: boolean;
+  download_url: string | null;
+  creator_name: string | null;
+  creator_avatar: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 
 // Workspace
 export interface Workspace {
@@ -147,6 +174,9 @@ export interface UserActivity {
   project_name: string;
   workspace_id: string;
   workspace_name: string;
+  user_id: string;
+  user_name: string | null;
+  user_avatar: string | null;
   type: ActivityType;
   content: string | null;
   created_at: string;

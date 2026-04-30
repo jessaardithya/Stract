@@ -1,6 +1,6 @@
 'use client';
 
-import { Hexagon } from 'lucide-react';
+import { Hexagon, UserPlus } from 'lucide-react';
 
 interface AuthCardProps {
   title: React.ReactNode;
@@ -11,6 +11,7 @@ interface AuthCardProps {
   asideTitle?: React.ReactNode;
   asideDescription?: React.ReactNode;
   asidePoints?: string[];
+  mode?: 'login' | 'signup';
 }
 
 export default function AuthCard({
@@ -26,20 +27,30 @@ export default function AuthCard({
     'Real-time updates across tasks, activity, and members',
     'Designed for focused project operations, not dashboard clutter',
   ],
+  mode = 'login',
 }: AuthCardProps) {
+  const isSignup = mode === 'signup';
+
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f4ee]">
+    <main className="min-h-screen overflow-hidden bg-[#fafaf8]">
       <div className="grid min-h-screen lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="relative flex min-h-[40vh] items-end overflow-hidden border-b border-[#e4e0d7] bg-[#f1ece3] px-6 py-8 md:px-10 lg:min-h-screen lg:border-b-0 lg:border-r lg:px-14 lg:py-14">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.16),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.1),transparent_26%)]" />
+        <section 
+          className="relative flex min-h-[40vh] items-end overflow-hidden border-b border-[#e4e0d7] bg-[#f1ece3] px-6 py-8 md:px-10 lg:min-h-screen lg:border-b-0 lg:border-r lg:px-14 lg:py-14"
+        >
+          {isSignup ? (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(236,72,153,0.12),transparent_40%)]" />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.16),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.12),transparent_40%)]" />
+          )}
+
           <div className="absolute right-[-6%] top-[14%] h-[280px] w-[280px] rounded-full border border-white/60 bg-white/50 blur-3xl" />
           <div className="absolute left-[8%] top-[18%] h-[120px] w-[120px] border border-black/[0.05] bg-white/45" />
           <div className="absolute bottom-[14%] right-[22%] h-[86px] w-[86px] rounded-full border border-black/[0.04] bg-white/35" />
 
           <div className="relative z-10 max-w-[540px]">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_18px_40px_rgba(99,102,241,0.28)]">
-                <Hexagon size={22} className="fill-current" />
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white ${isSignup ? 'bg-gradient-to-br from-orange-400 to-pink-500 shadow-[0_18px_40px_rgba(249,115,22,0.28)]' : 'bg-gradient-to-br from-indigo-500 to-violet-600 shadow-[0_18px_40px_rgba(99,102,241,0.28)]'}`}>
+                {isSignup ? <UserPlus size={22} className="ml-0.5" /> : <Hexagon size={22} className="fill-current" />}
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#8a8a85]">Stract</p>
@@ -69,9 +80,14 @@ export default function AuthCard({
           </div>
         </section>
 
-        <section className="flex items-center px-6 py-10 md:px-10 lg:px-14">
-          <div className="mx-auto w-full max-w-[460px]">
-            <div className="border border-[#e4e0d7] bg-white px-6 py-7 md:px-8 md:py-8">
+        <section className="flex items-center px-6 py-10 md:px-10 lg:px-14 relative">
+          {isSignup ? (
+            <div className="absolute inset-0 opacity-10 blur-xl bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.4),transparent_50%)] pointer-events-none" />
+          ) : (
+            <div className="absolute inset-0 opacity-10 blur-xl bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.4),transparent_50%)] pointer-events-none" />
+          )}
+          <div className="mx-auto w-full max-w-[460px] relative z-10">
+            <div className="border border-white/60 bg-white/80 backdrop-blur-3xl px-6 py-8 md:px-10 md:py-10 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] rounded-3xl">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#8a8a85]">{eyebrow}</p>
               <h2 className="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-gray-950">{title}</h2>
               <p className="mt-2 max-w-[42ch] text-sm leading-6 text-[#706b64]">{subtitle}</p>

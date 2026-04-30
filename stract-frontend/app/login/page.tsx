@@ -40,6 +40,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   const redirectTarget = searchParams.get('next') || '/home';
 
@@ -102,76 +107,134 @@ export default function Login() {
           </Link>
         </>
       }
+      mode="login"
     >
       <div className="space-y-6">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full justify-center border-[#ddd7cd] bg-[#faf8f3] font-medium text-gray-800 shadow-none hover:bg-[#f3efe7]"
-          onClick={handleGoogleSignIn}
-          disabled={oauthLoading}
-        >
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[50ms] fill-mode-both">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 rounded-xl w-full justify-center border-black/10 bg-white shadow-sm transition-all hover:bg-zinc-50 hover:border-black/20 text-zinc-800 font-medium text-[14px]"
+            onClick={handleGoogleSignIn}
+            disabled={oauthLoading}
+          >
           {oauthLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleMark />}
           Continue with Google
         </Button>
-
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#e6e0d6]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a8a85]">or use email</span>
-          <div className="h-px flex-1 bg-[#e6e0d6]" />
         </div>
 
-        <form onSubmit={handleEmailSignIn} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a8a85]">
+        <div className="flex items-center gap-3 animate-in fade-in duration-500 delay-[100ms] fill-mode-both">
+          <div className="h-px flex-1 bg-black/[0.06]" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8a8a85]">or use email</span>
+          <div className="h-px flex-1 bg-black/[0.06]" />
+        </div>
+
+        <form onSubmit={handleEmailSignIn} className="space-y-5">
+          <div className="space-y-2 group animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[150ms] fill-mode-both">
+            <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 transition-colors group-focus-within:text-violet-600">
               Email
             </Label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8a85]" />
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-violet-600" />
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="h-11 border-[#ddd7cd] bg-[#faf8f3] pl-10 shadow-none focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                className="h-12 rounded-xl text-[14px] border border-transparent bg-zinc-50/80 pl-11 shadow-none transition-all hover:bg-zinc-100 hover:border-black/5 focus-visible:bg-white focus-visible:border-violet-400 focus-visible:ring-[4px] focus-visible:ring-violet-500/10 placeholder:text-zinc-400"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2 group animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[200ms] fill-mode-both">
             <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a8a85]">
+              <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 transition-colors group-focus-within:text-violet-600">
                 Password
               </Label>
-              <span className="text-xs text-[#8a8a85]">Minimum 8 characters</span>
+              <span className="text-xs text-zinc-400">Minimum 8 characters</span>
             </div>
             <div className="relative">
-              <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8a85]" />
+              <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-violet-600" />
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11 border-[#ddd7cd] bg-[#faf8f3] pl-10 shadow-none focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                className="h-12 rounded-xl text-[14px] border border-transparent bg-zinc-50/80 pl-11 shadow-none transition-all hover:bg-zinc-100 hover:border-black/5 focus-visible:bg-white focus-visible:border-violet-400 focus-visible:ring-[4px] focus-visible:ring-violet-500/10"
               />
             </div>
           </div>
 
+          {/* Forgot password */}
+          {!forgotMode ? (
+            <button
+              type="button"
+              onClick={() => { setForgotMode(true); setForgotEmail(email); }}
+              className="text-[12px] text-violet-600 hover:text-violet-700 transition-colors text-left"
+            >
+              Forgot password?
+            </button>
+          ) : (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-3">
+              <div>
+                <p className="text-[13px] font-semibold text-gray-900">Reset your password</p>
+                <p className="text-[12px] text-gray-500 mt-0.5">Enter your email and we&apos;ll send you a reset link.</p>
+              </div>
+              <input
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="email@example.com"
+                className="h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-[13px] outline-none focus:border-violet-400 placeholder:text-gray-400"
+              />
+              {forgotMsg && <p className="text-[12px] text-green-600">{forgotMsg}</p>}
+              {forgotError && <p className="text-[12px] text-red-500">{forgotError}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setForgotError(null);
+                    setForgotLoading(true);
+                    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                      redirectTo: `${window.location.origin}/reset-password`,
+                    });
+                    if (error) setForgotError(error.message);
+                    else setForgotMsg('Check your email for a reset link.');
+                    setForgotLoading(false);
+                  }}
+                  disabled={forgotLoading || !forgotEmail}
+                  className="h-8 px-3 rounded-lg bg-violet-600 text-white text-[12px] font-medium hover:bg-violet-700 transition-colors disabled:opacity-50"
+                >
+                  {forgotLoading ? 'Sending…' : 'Send reset link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(false); setForgotMsg(null); setForgotError(null); }}
+                  className="text-[12px] text-gray-500 hover:text-gray-700"
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="border border-red-200/50 bg-red-50/50 rounded-xl px-4 py-3 text-sm text-red-600 animate-in fade-in duration-300">
               {error}
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="h-11 w-full justify-center bg-violet-600 text-white hover:bg-violet-700"
-            disabled={loading}
-          >
+          <div className="pt-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[250ms] fill-mode-both">
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-xl justify-center bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_8px_20px_-8px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all hover:shadow-[0_12px_24px_-10px_rgba(99,102,241,0.6)] hover:from-indigo-600 hover:to-violet-700 font-medium text-[14px]"
+              disabled={loading}
+            >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-            {loading ? 'Signing in...' : 'Sign in'}
-          </Button>
+              {loading ? 'Signing in...' : 'Sign in'}
+            </Button>
+          </div>
         </form>
       </div>
     </AuthCard>

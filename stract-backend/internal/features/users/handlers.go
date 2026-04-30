@@ -16,6 +16,9 @@ type UserActivity struct {
 	ProjectName   string  `json:"project_name"`
 	WorkspaceID   string  `json:"workspace_id"`
 	WorkspaceName string  `json:"workspace_name"`
+	UserID        string  `json:"user_id"`
+	UserName      *string `json:"user_name"`
+	UserAvatar    *string `json:"user_avatar"`
 	Type          string  `json:"type"`
 	Content       *string `json:"content"`
 	CreatedAt     string  `json:"created_at"`
@@ -43,6 +46,14 @@ func (h *Handler) GetMyActivity(c *gin.Context) {
 		        p.name,
 		        w.id,
 		        w.name,
+		        a.user_id,
+		        COALESCE(
+		          u.raw_user_meta_data->>'full_name',
+		          u.raw_user_meta_data->>'name',
+		          u.raw_user_meta_data->>'display_name',
+		          split_part(u.email, '@', 1)
+		        ) as user_name,
+		        u.raw_user_meta_data->>'avatar_url' as user_avatar,
 		        a.type,
 		        NULLIF(a.content, ''),
 		        a.created_at::text
@@ -51,6 +62,7 @@ func (h *Handler) GetMyActivity(c *gin.Context) {
 		 JOIN stract.projects p ON p.id = t.project_id
 		 JOIN stract.workspaces w ON w.id = p.workspace_id
 		 JOIN stract.workspace_members wm ON wm.workspace_id = w.id
+		 LEFT JOIN auth.users u ON u.id = a.user_id
 		 WHERE wm.user_id = $1
 		   AND w.archived_at IS NULL
 		   AND p.archived_at IS NULL
@@ -76,6 +88,9 @@ func (h *Handler) GetMyActivity(c *gin.Context) {
 			&item.ProjectName,
 			&item.WorkspaceID,
 			&item.WorkspaceName,
+			&item.UserID,
+			&item.UserName,
+			&item.UserAvatar,
 			&item.Type,
 			&item.Content,
 			&item.CreatedAt,
